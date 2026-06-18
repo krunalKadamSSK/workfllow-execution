@@ -44,6 +44,7 @@ class WorkflowInstanceResponse(BaseModel):
     completed_at: datetime | None = None
     node_instances: list[WorkflowNodeInstanceResponse] = Field(default_factory=list)
     pending_node_ids: list[str] = Field(default_factory=list)
+    next_task_id: str | None = None
     pending_node_forms: dict[str, PendingNodeFormResponse] = Field(default_factory=dict)
     workflow_projection: dict[str, Any] | None = None
 

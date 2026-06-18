@@ -42,5 +42,14 @@ class GraphScheduler:
             for node in self._graph.task_nodes
         )
 
+    def resolve_next_task_id(
+        self,
+        node_statuses: dict[str, NodeStatus],
+        *,
+        from_node_id: str,
+    ) -> str | None:
+        next_task = self._graph.next_pending_task_from(from_node_id, node_statuses)
+        return next_task.id if next_task is not None else None
+
     def downstream_task_nodes(self, node_id: str) -> tuple[GraphNode, ...]:
         return self._graph.downstream_task_nodes(node_id)

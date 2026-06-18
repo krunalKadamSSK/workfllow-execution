@@ -223,7 +223,12 @@ class WorkflowOrchestrator:
             expected_revision=expected_revision,
         )
 
-    def get_instance_state(self, workflow_instance_id: str) -> dict[str, Any]:
+    def get_instance_state(
+        self,
+        workflow_instance_id: str,
+        *,
+        after_task_id: str | None = None,
+    ) -> dict[str, Any]:
         instance = self._instances.require_workflow_instance(workflow_instance_id)
         node_instances = self._instances.list_node_instances(workflow_instance_id)
         workflow_state = self._projections.get_workflow_state(workflow_instance_id)
@@ -235,7 +240,39 @@ class WorkflowOrchestrator:
             "pending_node_forms": self._prepare_pending_node_forms(
                 workflow_instance_id, node_instances, graph
             ),
+            "next_task_id": self._resolve_next_task_id(
+                graph, node_instances, after_task_id=after_task_id
+            ),
         }
+
+    def _resolve_next_task_id(
+        self,
+        graph: WorkflowGraph,
+        node_instances: list[WorkflowNodeInstance],
+        *,
+        after_task_id: str | None,
+    ) -> str | None:
+        statuses = {node.workflow_node_id: node.status for node in node_instances}
+        anchor = after_task_id or self._anchor_node_id(graph, node_instances)
+        scheduler = GraphScheduler(graph)
+        return scheduler.resolve_next_task_id(statuses, from_node_id=anchor)
+
+    @staticmethod
+    def _anchor_node_id(
+        graph: WorkflowGraph, node_instances: list[WorkflowNodeInstance]
+    ) -> str:
+        completed = [node for node in node_instances if node.status == NodeStatus.COMPLETED]
+        if not completed:
+            return graph.start_node.id
+
+        topo_index = {
+            node_id: index for index, node_id in enumerate(graph.topological_order())
+        }
+        latest = max(
+            completed,
+            key=lambda node: topo_index.get(node.workflow_node_id, -1),
+        )
+        return latest.workflow_node_id
 
     def _prepare_pending_node_forms(
         self,

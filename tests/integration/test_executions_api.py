@@ -45,6 +45,7 @@ class TestExecutionsAPI:
         instance_id = instance["id"]
         assert instance["status"] == "RUNNING"
         assert instance["pending_node_ids"] == [GENERAL_INFO_GRAPH_NODE]
+        assert instance["next_task_id"] == GENERAL_INFO_GRAPH_NODE
         assert GENERAL_INFO_GRAPH_NODE not in instance["pending_node_forms"]
 
         get_response = api_client.get(f"/api/v1/instances/{instance_id}")
@@ -64,6 +65,7 @@ class TestExecutionsAPI:
         )
         assert submit_one.status_code == 200
         assert submit_one.json()["pending_node_ids"] == [RAW_MATERIAL_GRAPH_NODE]
+        assert submit_one.json()["next_task_id"] == RAW_MATERIAL_GRAPH_NODE
         pricing_form = submit_one.json()["pending_node_forms"][RAW_MATERIAL_GRAPH_NODE]["fields"]
         pricing_fields = {field["id"]: field for field in pricing_form}
         assert pricing_fields["customerName"]["defaultValue"] == "ACME"
@@ -85,6 +87,7 @@ class TestExecutionsAPI:
         completed = submit_two.json()
         assert completed["status"] == "COMPLETED"
         assert completed["pending_node_ids"] == []
+        assert completed["next_task_id"] is None
         assert (
             completed["workflow_projection"]["nodes"][RAW_MATERIAL_GRAPH_NODE]["outputs"][
                 "inputWeight"

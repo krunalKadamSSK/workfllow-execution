@@ -24,6 +24,11 @@ def get_execution_service(session: Session = Depends(get_session)) -> ExecutionS
 
 def _instance_response(state: dict) -> WorkflowInstanceResponse:
     instance = state["instance"]
+    pending_node_ids = [
+        node.workflow_node_id
+        for node in state["node_instances"]
+        if node.status == NodeStatus.PENDING
+    ]
     return WorkflowInstanceResponse(
         id=instance.id,
         name=instance.name,
@@ -43,11 +48,8 @@ def _instance_response(state: dict) -> WorkflowInstanceResponse:
             )
             for node in state["node_instances"]
         ],
-        pending_node_ids=[
-            node.workflow_node_id
-            for node in state["node_instances"]
-            if node.status == NodeStatus.PENDING
-        ],
+        pending_node_ids=pending_node_ids,
+        next_task_id=state.get("next_task_id"),
         pending_node_forms={
             workflow_node_id: PendingNodeFormResponse(**form)
             for workflow_node_id, form in state.get("pending_node_forms", {}).items()
@@ -101,7 +103,7 @@ def submit_node_outputs(
         expected_revision=payload.expected_revision,
     )
     session.commit()
-    state = service.get_instance_state(instance_id)
+    state = service.get_instance_state(instance_id, after_task_id=workflow_node_id)
     return _instance_response(state)
 
 

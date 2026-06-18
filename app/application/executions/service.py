@@ -106,8 +106,12 @@ class ExecutionService:
             workflow_instance_id, expected_revision=expected_revision
         )
 
-    def get_instance_state(self, workflow_instance_id: str) -> dict[str, Any]:
-        return self._orchestrator.get_instance_state(workflow_instance_id)
+    def get_instance_state(
+        self, workflow_instance_id: str, *, after_task_id: str | None = None
+    ) -> dict[str, Any]:
+        return self._orchestrator.get_instance_state(
+            workflow_instance_id, after_task_id=after_task_id
+        )
 
     def list_events(self, workflow_instance_id: str):
         return self._event_repository.list_events(workflow_instance_id)

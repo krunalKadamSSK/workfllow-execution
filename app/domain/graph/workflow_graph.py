@@ -5,6 +5,8 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from app.domain.enums import NodeStatus
+
 NodeKind = Literal["start", "task", "end"]
 
 
@@ -167,6 +169,33 @@ class WorkflowGraph:
             queue.extend(self.successors(current_id))
 
         return tuple(task_nodes)
+
+    def next_pending_task_from(
+        self,
+        source_node_id: str,
+        node_statuses: Mapping[str, NodeStatus],
+    ) -> GraphNode | None:
+        """First PENDING task reachable along outgoing edges from source_node_id."""
+        visited: set[str] = set()
+
+        def walk(node_id: str) -> GraphNode | None:
+            for successor_id in self.successors(node_id):
+                if successor_id in visited:
+                    continue
+                visited.add(successor_id)
+
+                node = self.require_node(successor_id)
+                if node.is_task:
+                    if node_statuses.get(node.id) == NodeStatus.PENDING:
+                        return node
+                    continue
+
+                found = walk(successor_id)
+                if found is not None:
+                    return found
+            return None
+
+        return walk(source_node_id)
 
     def topological_order(self) -> tuple[str, ...]:
         indegree = {node.id: len(self.predecessors(node.id)) for node in self.nodes}

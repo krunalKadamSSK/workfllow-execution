@@ -74,3 +74,29 @@ def test_all_tasks_completed():
     scheduler = GraphScheduler(graph)
     assert not scheduler.all_tasks_completed({"task-1": NodeStatus.PENDING})
     assert scheduler.all_tasks_completed({"task-1": NodeStatus.COMPLETED})
+
+
+def test_resolve_next_task_id_from_completed_task():
+    graph = WorkflowGraph.from_definition_json(
+        {
+            "nodes": [
+                {"id": "start", "kind": "start"},
+                {"id": "task-1", "kind": "task", "nodeDefinitionId": "n1"},
+                {"id": "task-2", "kind": "task", "nodeDefinitionId": "n2"},
+                {"id": "end", "kind": "end"},
+            ],
+            "edges": [
+                {"id": "e1", "source": "start", "target": "task-1"},
+                {"id": "e2", "source": "task-1", "target": "task-2"},
+                {"id": "e3", "source": "task-2", "target": "end"},
+            ],
+        }
+    )
+    scheduler = GraphScheduler(graph)
+    statuses = {
+        "task-1": NodeStatus.COMPLETED,
+        "task-2": NodeStatus.PENDING,
+    }
+
+    assert scheduler.resolve_next_task_id(statuses, from_node_id="task-1") == "task-2"
+    assert scheduler.resolve_next_task_id(statuses, from_node_id="task-2") is None

@@ -42,6 +42,63 @@ class TestWorkflowGraph:
         assert len(downstream) == 1
         assert downstream[0].node_definition_id == "220b5a4f-de75-45ef-b3bb-8f7f794e301e"
 
+    def test_next_pending_task_follows_outgoing_edge(self):
+        from app.domain.enums import NodeStatus
+
+        graph = WorkflowGraph.from_definition_json(
+            {
+                "nodes": [
+                    {"id": "start", "kind": "start"},
+                    {"id": "task-a", "kind": "task", "nodeDefinitionId": "n1"},
+                    {"id": "task-b", "kind": "task", "nodeDefinitionId": "n2"},
+                    {"id": "task-c", "kind": "task", "nodeDefinitionId": "n3"},
+                    {"id": "end", "kind": "end"},
+                ],
+                "edges": [
+                    {"id": "e1", "source": "start", "target": "task-a"},
+                    {"id": "e2", "source": "task-a", "target": "task-b"},
+                    {"id": "e3", "source": "task-a", "target": "task-c"},
+                    {"id": "e4", "source": "task-b", "target": "end"},
+                    {"id": "e5", "source": "task-c", "target": "end"},
+                ],
+            }
+        )
+
+        next_task = graph.next_pending_task_from(
+            "task-a",
+            {
+                "task-a": NodeStatus.COMPLETED,
+                "task-b": NodeStatus.PENDING,
+                "task-c": NodeStatus.WAITING,
+            },
+        )
+        assert next_task is not None
+        assert next_task.id == "task-b"
+
+    def test_next_pending_task_from_start(self):
+        from app.domain.enums import NodeStatus
+
+        graph = WorkflowGraph.from_definition_json(
+            {
+                "nodes": [
+                    {"id": "start", "kind": "start"},
+                    {"id": "task-1", "kind": "task", "nodeDefinitionId": "n1"},
+                    {"id": "end", "kind": "end"},
+                ],
+                "edges": [
+                    {"id": "e1", "source": "start", "target": "task-1"},
+                    {"id": "e2", "source": "task-1", "target": "end"},
+                ],
+            }
+        )
+
+        next_task = graph.next_pending_task_from(
+            "start",
+            {"task-1": NodeStatus.PENDING},
+        )
+        assert next_task is not None
+        assert next_task.id == "task-1"
+
     def test_topological_order(self, workflow_graph: WorkflowGraph):
         order = workflow_graph.topological_order()
         assert order[0] == workflow_graph.start_node.id
