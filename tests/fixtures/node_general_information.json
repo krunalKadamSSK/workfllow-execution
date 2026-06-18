@@ -1,0 +1,67 @@
+{
+  "id": "4eb5cfe4-8eff-463a-a315-a39f31a26756",
+  "appearance": {
+    "icon": { "kind": "lucide", "name": "FormInput" },
+    "color": { "kind": "token", "value": "primary" },
+    "shape": "card",
+    "badge": "INPUT"
+  },
+  "baseKind": "userInput",
+  "description": null,
+  "form": {
+    "fields": [
+      {
+        "id": "customerName",
+        "type": "select",
+        "label": "customer name",
+        "placeholder": "enter customer name",
+        "remoteOptions": {
+          "url": "http://localhost:8000/customer_master",
+          "labelKey": "name",
+          "valueKey": "name"
+        },
+        "validation": [
+          { "rule": "required", "message": "please enter value here" }
+        ]
+      },
+      {
+        "id": "partName",
+        "type": "select",
+        "label": "part name",
+        "placeholder": "enter part name",
+        "remoteOptions": {
+          "url": "http://localhost:8000/cad_part_master",
+          "labelKey": "part_name",
+          "valueKey": "part_id"
+        }
+      },
+      {
+        "id": "castingProcess",
+        "type": "select",
+        "label": "casting process",
+        "placeholder": "enter process",
+        "options": [
+          { "label": "Gravity die casting", "value": "GDC" },
+          { "label": "pressure die casting ", "value": "PDC" }
+        ],
+        "validation": [
+          { "rule": "required", "message": "please enter value here" }
+        ]
+      },
+      {
+        "id": "volume",
+        "type": "number",
+        "label": "volume",
+        "placeholder": "quantity of production ",
+        "validation": [
+          { "rule": "required", "message": "this field is required" },
+          { "rule": "min", "value": 1, "message": "min one quantity is required." }
+        ]
+      }
+    ]
+  },
+  "name": "General information",
+  "slug": "general-information",
+  "status": "published",
+  "version": "1.0.0"
+}

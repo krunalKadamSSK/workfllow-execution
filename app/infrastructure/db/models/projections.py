@@ -51,6 +51,4 @@ class WorkflowNodeProjection(Base):
         nullable=False,
     )
 
-    workflow_node_instance: Mapped[WorkflowNodeInstance] = relationship(
-        back_populates="projection"
-    )
+    workflow_node_instance: Mapped[WorkflowNodeInstance] = relationship(back_populates="projection")

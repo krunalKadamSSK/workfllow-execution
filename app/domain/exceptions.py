@@ -23,3 +23,7 @@ class VersionConflictError(WorkflowEngineError):
 
 class SequenceConflictError(WorkflowEngineError):
     code = "SEQUENCE_CONFLICT"
+
+
+class ValidationError(WorkflowEngineError):
+    code = "VALIDATION_ERROR"

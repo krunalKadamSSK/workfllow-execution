@@ -1,0 +1,53 @@
+{
+  "id": "220b5a4f-de75-45ef-b3bb-8f7f794e301e",
+  "appearance": {
+    "icon": { "kind": "lucide", "name": "FormInput" },
+    "color": { "kind": "token", "value": "primary" },
+    "shape": "card",
+    "badge": "INPUT"
+  },
+  "baseKind": "userInput",
+  "description": null,
+  "form": {
+    "fields": [
+      {
+        "id": "customerName",
+        "type": "text",
+        "label": "customer name",
+        "validation": [{ "rule": "required", "message": "customer name is required" }]
+      },
+      {
+        "id": "partName",
+        "type": "text",
+        "label": "part name",
+        "validation": [{ "rule": "required", "message": "part name is required" }]
+      },
+      {
+        "id": "meltLossPercentage",
+        "type": "number",
+        "label": "Melt Loss Percentage",
+        "validation": [
+          { "rule": "required", "message": "please enter value here" },
+          { "rule": "min", "value": 3, "message": "please at least 3" }
+        ]
+      },
+      {
+        "id": "rawWeight",
+        "type": "number",
+        "label": "raw weight",
+        "readOnly": true
+      },
+      {
+        "id": "inputWeight",
+        "type": "number",
+        "label": "input weight",
+        "readOnly": true,
+        "calculation": { "formula": "meltLossPercentage+rawWeight" }
+      }
+    ]
+  },
+  "name": "Raw Material Pricing",
+  "slug": "raw-material-pricing",
+  "status": "published",
+  "version": "1.0.0"
+}

@@ -1,0 +1,69 @@
+{
+  "id": "1091df5d-58d8-4233-abd5-0a85ec476470",
+  "description": null,
+  "edges": [
+    {
+      "id": "1652af06-a8cb-4ab2-9d1a-6aa487420836",
+      "source": "92579c4a-314e-418a-97a4-2a2972ced2e0",
+      "target": "c24086be-e3d1-4953-8bbf-6b696b8fdd8e"
+    },
+    {
+      "id": "08ef5376-783a-424a-9d5c-e7e7475b9090",
+      "source": "c24086be-e3d1-4953-8bbf-6b696b8fdd8e",
+      "target": "7cf5eaa7-5a13-412b-8bb8-5f6cf386ad68"
+    },
+    {
+      "id": "33c394da-faee-4e37-b9b4-f40f03909fc6",
+      "source": "7cf5eaa7-5a13-412b-8bb8-5f6cf386ad68",
+      "target": "af0b00c0-e762-4fff-9a97-36e9e0d12138"
+    }
+  ],
+  "name": "testWorkflow",
+  "nodes": [
+    {
+      "id": "92579c4a-314e-418a-97a4-2a2972ced2e0",
+      "kind": "start",
+      "position": { "x": -64, "y": 288 }
+    },
+    {
+      "id": "c24086be-e3d1-4953-8bbf-6b696b8fdd8e",
+      "kind": "task",
+      "nodeDefinitionId": "4eb5cfe4-8eff-463a-a315-a39f31a26756",
+      "position": { "x": 40, "y": 296 }
+    },
+    {
+      "id": "7cf5eaa7-5a13-412b-8bb8-5f6cf386ad68",
+      "kind": "task",
+      "nodeDefinitionId": "220b5a4f-de75-45ef-b3bb-8f7f794e301e",
+      "position": { "x": 296, "y": 288 },
+      "inputs": [
+        {
+          "inputKey": "customerName",
+          "source": {
+            "kind": "upstream",
+            "sourceNodeId": "c24086be-e3d1-4953-8bbf-6b696b8fdd8e",
+            "outputKey": "customerName"
+          },
+          "locked": true
+        },
+        {
+          "inputKey": "partName",
+          "source": {
+            "kind": "upstream",
+            "sourceNodeId": "c24086be-e3d1-4953-8bbf-6b696b8fdd8e",
+            "outputKey": "partName"
+          },
+          "locked": true
+        }
+      ]
+    },
+    {
+      "id": "af0b00c0-e762-4fff-9a97-36e9e0d12138",
+      "kind": "end",
+      "position": { "x": 576, "y": 288 }
+    }
+  ],
+  "slug": "test-workflow",
+  "status": "published",
+  "version": "1"
+}

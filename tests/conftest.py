@@ -14,6 +14,19 @@ def client() -> TestClient:
     return TestClient(app)
 
 
+@pytest.fixture
+def api_client(db_session) -> TestClient:
+    from app.api.deps import get_session
+
+    def override_get_session():
+        yield db_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
+
+
 def _database_available() -> bool:
     try:
         engine = create_engine(
