@@ -13,6 +13,7 @@ class ExecutionContext:
     base_kind: str
     definition_json: dict[str, Any]
     resolved_inputs: dict[str, Any] = field(default_factory=dict)
+    locked_input_keys: frozenset[str] = field(default_factory=frozenset)
     execution_number: int = 0
 
 
