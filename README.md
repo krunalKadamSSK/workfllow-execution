@@ -57,5 +57,29 @@ sudo apt install docker-compose-v2
 
 | Service  | Port | Connection |
 |----------|------|------------|
-| Postgres | 5432 | `postgresql+asyncpg://workflow:workflow@localhost:5432/workflow_engine` |
+| Postgres | 5432 | `postgresql+psycopg://workflow:workflow@localhost:5432/workflow_engine` |
 | Redis    | 6379 | `redis://localhost:6379/0` |
+
+## Development commands
+
+```bash
+make install      # pip install -r requirements.txt
+make lint         # ruff check
+make format       # ruff format
+make test         # pytest
+make check        # lint + test
+make pre-commit   # run all pre-commit hooks
+```
+
+## Health endpoints
+
+| Endpoint   | Purpose |
+|------------|---------|
+| `GET /health` | Liveness — process is running |
+| `GET /ready`  | Readiness — PostgreSQL and Redis reachable (503 if not) |
+
+All responses include an `X-Request-ID` header for request correlation.
+
+## Architecture
+
+See [docs/adr/001-architecture-and-standards.md](docs/adr/001-architecture-and-standards.md) for layer layout, SOLID rules, design patterns, and error taxonomy.
