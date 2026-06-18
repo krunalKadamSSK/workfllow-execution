@@ -6,8 +6,10 @@ from app.application.definitions.ingest import DefinitionIngestService
 from app.modules.definitions.schemas.nodes import NodeDefinitionIngest
 from app.modules.definitions.schemas.responses import (
     NodeDefinitionResponse,
+    NodeDefinitionSummary,
     NodeDefinitionVersionResponse,
     WorkflowDefinitionResponse,
+    WorkflowDefinitionSummary,
     WorkflowDefinitionVersionResponse,
 )
 from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
@@ -52,6 +54,14 @@ def publish_node_definition(
     return _node_response(node, version)
 
 
+@router.get("/nodes", response_model=list[NodeDefinitionSummary])
+def list_node_definitions(
+    session: Session = Depends(get_session),
+) -> list[NodeDefinitionSummary]:
+    service = DefinitionIngestService(session)
+    return [NodeDefinitionSummary.model_validate(node) for node in service.list_nodes()]
+
+
 @router.get("/nodes/{slug}", response_model=NodeDefinitionResponse)
 def get_node_definition(
     slug: str,
@@ -83,6 +93,16 @@ def publish_workflow_definition(
     workflow, version = service.publish_workflow(payload)
     session.commit()
     return _workflow_response(workflow, version)
+
+
+@router.get("/workflows", response_model=list[WorkflowDefinitionSummary])
+def list_workflow_definitions(
+    session: Session = Depends(get_session),
+) -> list[WorkflowDefinitionSummary]:
+    service = DefinitionIngestService(session)
+    return [
+        WorkflowDefinitionSummary.model_validate(workflow) for workflow in service.list_workflows()
+    ]
 
 
 @router.get("/workflows/{slug}", response_model=WorkflowDefinitionResponse)

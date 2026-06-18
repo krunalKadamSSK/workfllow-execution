@@ -61,6 +61,23 @@ class TestDefinitionsAPI:
         response = api_client.get("/api/v1/definitions/workflows/does-not-exist")
         assert response.status_code == 404
 
+    def test_list_definitions_returns_summaries(self, api_client: TestClient):
+        api_client.post("/api/v1/definitions/nodes", json=_load("node_general_information.json"))
+        api_client.post("/api/v1/definitions/nodes", json=_load("node_raw_material_pricing.json"))
+        api_client.post("/api/v1/definitions/workflows", json=_load("workflow_test.json"))
+
+        nodes_response = api_client.get("/api/v1/definitions/nodes")
+        assert nodes_response.status_code == 200
+        node_slugs = {item["slug"] for item in nodes_response.json()}
+        assert node_slugs == {"general-information", "raw-material-pricing"}
+
+        workflows_response = api_client.get("/api/v1/definitions/workflows")
+        assert workflows_response.status_code == 200
+        workflows = workflows_response.json()
+        assert len(workflows) == 1
+        assert workflows[0]["slug"] == "test-workflow"
+        assert "definition_json" not in workflows[0]
+
     def test_workflow_ingest_model_requires_slug(self):
         payload = _load("workflow_test.json")
         payload["slug"] = None

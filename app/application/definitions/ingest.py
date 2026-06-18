@@ -103,6 +103,12 @@ class DefinitionIngestService:
 
         return workflow, workflow_version
 
+    def list_nodes(self) -> list[NodeDefinition]:
+        return self._repo.list_node_definitions()
+
+    def list_workflows(self) -> list[WorkflowDefinition]:
+        return self._repo.list_workflow_definitions()
+
     def _publish_existing_node(
         self,
         existing: NodeDefinition,

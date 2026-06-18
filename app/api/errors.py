@@ -10,7 +10,10 @@ from app.domain.exceptions import (
     InvalidTransitionError,
     NodeExecutionError,
     NotFoundError,
+    SequenceConflictError,
+    UpstreamNotReadyError,
     ValidationError,
+    VersionConflictError,
     WorkflowEngineError,
 )
 
@@ -111,6 +114,48 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def node_execution_handler(request: Request, exc: NodeExecutionError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
+            content=_error_body(
+                code=exc.code,
+                message=exc.message,
+                request=request,
+                details=exc.details,
+            ),
+        )
+
+    @app.exception_handler(VersionConflictError)
+    async def version_conflict_handler(
+        request: Request, exc: VersionConflictError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=_error_body(
+                code=exc.code,
+                message=exc.message,
+                request=request,
+                details=exc.details,
+            ),
+        )
+
+    @app.exception_handler(SequenceConflictError)
+    async def sequence_conflict_handler(
+        request: Request, exc: SequenceConflictError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=_error_body(
+                code=exc.code,
+                message=exc.message,
+                request=request,
+                details=exc.details,
+            ),
+        )
+
+    @app.exception_handler(UpstreamNotReadyError)
+    async def upstream_not_ready_handler(
+        request: Request, exc: UpstreamNotReadyError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
             content=_error_body(
                 code=exc.code,
                 message=exc.message,

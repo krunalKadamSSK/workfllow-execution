@@ -48,3 +48,27 @@ class WorkflowDefinitionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     version: WorkflowDefinitionVersionResponse | None = None
+
+
+class NodeDefinitionSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    slug: str
+    status: str
+    latest_version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkflowDefinitionSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    slug: str
+    status: str
+    latest_version: int
+    created_at: datetime
+    updated_at: datetime

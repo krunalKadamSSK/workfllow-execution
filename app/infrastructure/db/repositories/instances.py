@@ -1,14 +1,16 @@
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import select
 
+from app.domain.enums import ExecutionStatus, NodeStatus, WorkflowStatus
 from app.domain.exceptions import NotFoundError, VersionConflictError
+from app.domain.state.node import NodeStateMachine
 from app.infrastructure.db.models import (
-    NodeStatus,
     WorkflowInstance,
+    WorkflowNodeExecution,
     WorkflowNodeInstance,
     WorkflowSnapshot,
-    WorkflowStatus,
 )
 from app.infrastructure.db.repositories.base import BaseRepository
 
@@ -82,6 +84,64 @@ class InstanceRepository(BaseRepository):
     def get_node_instance(self, node_instance_id: str) -> WorkflowNodeInstance | None:
         return self.session.get(WorkflowNodeInstance, node_instance_id)
 
+    def get_node_instance_by_graph_id(
+        self, workflow_instance_id: str, workflow_node_id: str
+    ) -> WorkflowNodeInstance | None:
+        return self.session.scalar(
+            select(WorkflowNodeInstance).where(
+                WorkflowNodeInstance.workflow_instance_id == workflow_instance_id,
+                WorkflowNodeInstance.workflow_node_id == workflow_node_id,
+            )
+        )
+
+    def require_node_instance_by_graph_id(
+        self, workflow_instance_id: str, workflow_node_id: str
+    ) -> WorkflowNodeInstance:
+        node_instance = self.get_node_instance_by_graph_id(
+            workflow_instance_id, workflow_node_id
+        )
+        if node_instance is None:
+            raise NotFoundError(
+                f"Workflow node instance not found: {workflow_node_id} "
+                f"in instance {workflow_instance_id}"
+            )
+        return node_instance
+
+    def update_node_status(
+        self,
+        node_instance: WorkflowNodeInstance,
+        status: NodeStatus,
+    ) -> WorkflowNodeInstance:
+        NodeStateMachine().transition(node_instance.status, status)
+        node_instance.status = status
+        self.session.flush()
+        return node_instance
+
+    def create_node_execution(
+        self,
+        *,
+        workflow_instance_id: str,
+        node_instance: WorkflowNodeInstance,
+        inputs_json: dict,
+        outputs_json: dict,
+        status: ExecutionStatus,
+        executed_by: str | None = None,
+    ) -> WorkflowNodeExecution:
+        execution_number = node_instance.current_execution + 1
+        node_instance.current_execution = execution_number
+        execution = WorkflowNodeExecution(
+            workflow_instance_id=workflow_instance_id,
+            workflow_node_instance_id=node_instance.id,
+            execution_number=execution_number,
+            inputs_json=inputs_json,
+            outputs_json=outputs_json,
+            status=status,
+            executed_by=executed_by,
+        )
+        self.session.add(execution)
+        self.session.flush()
+        return execution
+
     def update_workflow_status(
         self,
         instance: WorkflowInstance,
@@ -96,6 +156,8 @@ class InstanceRepository(BaseRepository):
             )
         instance.status = status
         instance.current_revision += 1
+        if status == WorkflowStatus.COMPLETED:
+            instance.completed_at = datetime.now(timezone.utc)
         self.session.flush()
         return instance
 

@@ -46,3 +46,7 @@ class FieldValidationError(WorkflowEngineError):
 
     def __init__(self, message: str, *, field_errors: list | None = None):
         super().__init__(message, details=field_errors or [])
+
+
+class UpstreamNotReadyError(WorkflowEngineError):
+    code = "UPSTREAM_NOT_READY"

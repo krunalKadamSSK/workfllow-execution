@@ -44,6 +44,17 @@ class NodeReadyPayload:
 
 
 @dataclasses.dataclass(frozen=True)
+class NodeStartedPayload:
+    workflow_instance_id: str
+    workflow_node_instance_id: str
+    workflow_node_id: str
+    execution_number: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True)
 class NodeCompletedPayload:
     workflow_instance_id: str
     workflow_node_instance_id: str

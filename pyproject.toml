@@ -39,6 +39,7 @@ ignore = [
 "app/domain/events/types.py" = ["UP042"]
 "alembic/versions/*.py" = ["UP007", "UP035"]
 "app/core/logging.py" = ["UP017"]
+"app/infrastructure/db/repositories/instances.py" = ["UP017"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

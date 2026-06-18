@@ -164,6 +164,16 @@ class DefinitionRepository(BaseRepository):
     ) -> WorkflowDefinitionVersion | None:
         return self.session.get(WorkflowDefinitionVersion, version_id)
 
+    def list_node_definitions(self) -> list[NodeDefinition]:
+        return list(
+            self.session.scalars(select(NodeDefinition).order_by(NodeDefinition.name))
+        )
+
+    def list_workflow_definitions(self) -> list[WorkflowDefinition]:
+        return list(
+            self.session.scalars(select(WorkflowDefinition).order_by(WorkflowDefinition.name))
+        )
+
     def pin_workflow_version(
         self, workflow_definition_id: str, version: int | None = None
     ) -> WorkflowDefinitionVersion:
