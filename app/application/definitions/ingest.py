@@ -8,6 +8,8 @@ from app.infrastructure.db.models import (
     WorkflowDefinition,
     WorkflowDefinitionVersion,
 )
+from app.infrastructure.db.models.base_types import BaseType
+from app.infrastructure.db.repositories.base_types import BaseTypeRepository
 from app.infrastructure.db.repositories.definitions import DefinitionRepository
 from app.modules.definitions.schemas.nodes import NodeDefinitionIngest
 from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
@@ -16,6 +18,7 @@ from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
 class DefinitionIngestService:
     def __init__(self, session: Session) -> None:
         self._repo = DefinitionRepository(session)
+        self._base_types = BaseTypeRepository(session)
 
     def publish_node(
         self,
@@ -23,6 +26,8 @@ class DefinitionIngestService:
         *,
         created_by: str | None = None,
     ) -> tuple[NodeDefinition, NodeDefinitionVersion]:
+        self._base_types.require_enabled_kind(payload.baseKind)
+
         existing = self._repo.get_node_definition(payload.id)
         if existing is not None:
             return self._publish_existing_node(existing, payload, created_by=created_by)
@@ -109,6 +114,9 @@ class DefinitionIngestService:
 
     def list_workflows(self) -> list[WorkflowDefinition]:
         return self._repo.list_workflow_definitions()
+
+    def list_base_types(self, *, enabled_only: bool = True) -> list[BaseType]:
+        return self._base_types.list_base_types(enabled_only=enabled_only)
 
     def _publish_existing_node(
         self,

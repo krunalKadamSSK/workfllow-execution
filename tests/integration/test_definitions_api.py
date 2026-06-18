@@ -15,6 +15,15 @@ def _load(name: str) -> dict:
 
 @pytest.mark.integration
 class TestDefinitionsAPI:
+    def test_list_base_types(self, api_client: TestClient):
+        response = api_client.get("/api/v1/definitions/base-types")
+        assert response.status_code == 200
+        kinds = {item["kind"] for item in response.json()}
+        assert kinds == {"userInput", "ai", "script"}
+        user_input = next(item for item in response.json() if item["kind"] == "userInput")
+        assert user_input["displayName"] == "User task"
+        assert user_input["enabled"] is True
+
     def test_publish_and_get_node_definition(self, api_client: TestClient):
         payload = _load("node_general_information.json")
         response = api_client.post("/api/v1/definitions/nodes", json=payload)

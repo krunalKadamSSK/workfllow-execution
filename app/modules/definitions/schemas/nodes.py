@@ -89,10 +89,10 @@ class NodeDefinitionJson(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    baseKind: Literal["userInput"]
+    baseKind: Literal["userInput", "ai", "script"]
     appearance: AppearanceConfig
     description: str | None = None
-    form: FormConfig
+    form: FormConfig | None = None
 
 
 class NodeDefinitionIngest(BaseModel):
@@ -105,18 +105,23 @@ class NodeDefinitionIngest(BaseModel):
     slug: str
     status: str
     version: str | int
-    baseKind: Literal["userInput"]
+    baseKind: Literal["userInput", "ai", "script"]
     appearance: AppearanceConfig
     description: str | None = None
-    form: FormConfig
+    form: FormConfig | None = None
 
     def to_stored_json(self) -> dict:
-        return NodeDefinitionJson(
+        payload: dict = NodeDefinitionJson(
             baseKind=self.baseKind,
             appearance=self.appearance,
             description=self.description,
             form=self.form,
-        ).model_dump()
+        ).model_dump(exclude_none=True)
+        if self.baseKind == "userInput" and "form" not in payload:
+            payload["form"] = FormConfig().model_dump()
+        return payload
 
     def output_field_ids(self) -> set[str]:
+        if self.form is None:
+            return set()
         return {field.id for field in self.form.fields}

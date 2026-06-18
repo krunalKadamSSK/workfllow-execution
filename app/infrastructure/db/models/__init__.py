@@ -1,3 +1,4 @@
+from app.infrastructure.db.models.base_types import BaseType
 from app.infrastructure.db.models.definitions import (
     NodeDefinition,
     NodeDefinitionVersion,
@@ -15,6 +16,7 @@ from app.infrastructure.db.models.instances import (
 from app.infrastructure.db.models.projections import WorkflowNodeProjection, WorkflowProjection
 
 __all__ = [
+    "BaseType",
     "ExecutionStatus",
     "NodeDefinition",
     "NodeDefinitionVersion",

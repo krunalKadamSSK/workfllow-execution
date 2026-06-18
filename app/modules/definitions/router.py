@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_session
 from app.application.definitions.ingest import DefinitionIngestService
+from app.modules.definitions.schemas.base_types import BaseTypeResponse
 from app.modules.definitions.schemas.nodes import NodeDefinitionIngest
 from app.modules.definitions.schemas.responses import (
     NodeDefinitionResponse,
@@ -15,6 +16,14 @@ from app.modules.definitions.schemas.responses import (
 from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
 
 router = APIRouter(prefix="/definitions", tags=["definitions"])
+
+
+@router.get("/base-types", response_model=list[BaseTypeResponse])
+def list_base_types(
+    session: Session = Depends(get_session),
+) -> list[BaseTypeResponse]:
+    service = DefinitionIngestService(session)
+    return [BaseTypeResponse.model_validate(base_type) for base_type in service.list_base_types()]
 
 
 def _node_response(node, version) -> NodeDefinitionResponse:

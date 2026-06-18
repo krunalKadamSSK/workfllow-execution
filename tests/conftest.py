@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session, sessionmaker
 import app.infrastructure.db.models  # noqa: F401
 from app.core.config import settings
 from app.infrastructure.db.base import Base
+from app.infrastructure.db.models.base_types import BaseType
+from app.infrastructure.db.seeds.base_types import BASE_TYPES_SEED
 from app.main import app
 
 
@@ -60,6 +62,10 @@ requires_database = pytest.mark.integration
 def db_engine():
     engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
     Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        if session.scalar(text("SELECT COUNT(*) FROM base_types")) == 0:
+            session.add_all([BaseType(**row) for row in BASE_TYPES_SEED])
+            session.commit()
     yield engine
     Base.metadata.drop_all(engine)
     engine.dispose()
