@@ -80,6 +80,15 @@ make pre-commit   # run all pre-commit hooks
 
 All responses include an `X-Request-ID` header for request correlation.
 
+## Database migrations
+
+```bash
+make migrate                    # alembic upgrade head
+make migration msg='describe'   # autogenerate new revision (requires Postgres)
+```
+
+Initial schema is in `alembic/versions/001_initial_workflow_schema.py`.
+
 ## Architecture
 
 See [docs/adr/001-architecture-and-standards.md](docs/adr/001-architecture-and-standards.md) for layer layout, SOLID rules, design patterns, and error taxonomy.

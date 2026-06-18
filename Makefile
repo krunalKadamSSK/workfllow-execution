@@ -25,7 +25,16 @@ format:
 	ruff format app tests
 
 test:
+	pytest -q -m "not integration"
+
+test-all:
 	pytest -q
+
+migrate:
+	alembic upgrade head
+
+migration:
+	alembic revision --autogenerate -m "$(msg)"
 
 check: lint test
 

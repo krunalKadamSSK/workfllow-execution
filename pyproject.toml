@@ -8,6 +8,9 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
+markers = [
+    "integration: tests requiring PostgreSQL (run with: pytest -m integration)",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
@@ -29,6 +32,11 @@ select = [
 ignore = [
     "B008",  # Depends() in FastAPI route defaults
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"app/infrastructure/db/models/*.py" = ["F821", "UP042"]
+"alembic/versions/*.py" = ["UP007", "UP035"]
+"app/core/logging.py" = ["UP017"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
