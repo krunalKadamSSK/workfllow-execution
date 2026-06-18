@@ -9,9 +9,17 @@ class WorkflowStartedPayload:
     workflow_instance_id: str
     workflow_definition_id: str
     workflow_definition_version_id: str
+    snapshot_json: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
+        payload = {
+            "workflow_instance_id": self.workflow_instance_id,
+            "workflow_definition_id": self.workflow_definition_id,
+            "workflow_definition_version_id": self.workflow_definition_version_id,
+        }
+        if self.snapshot_json is not None:
+            payload["snapshot_json"] = self.snapshot_json
+        return payload
 
 
 @dataclasses.dataclass(frozen=True)

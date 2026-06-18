@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
     LOG_JSON: bool = False
+    EVENT_HASH_CHAIN: bool = False
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

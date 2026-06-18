@@ -43,9 +43,7 @@ class UserInputExecutor(BaseNodeExecutor):
     def _form_fields(self, context: ExecutionContext) -> list[dict[str, Any]]:
         return context.definition_json.get("form", {}).get("fields", [])
 
-    def _validate_locked_inputs(
-        self, context: ExecutionContext, outputs: dict[str, Any]
-    ) -> None:
+    def _validate_locked_inputs(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
         errors: list[dict[str, str]] = []
         for key in context.locked_input_keys:
             if key not in context.resolved_inputs:

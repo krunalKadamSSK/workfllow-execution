@@ -99,6 +99,13 @@ class InstanceRepository(BaseRepository):
         self.session.flush()
         return instance
 
+    def get_snapshot(self, workflow_instance_id: str) -> WorkflowSnapshot | None:
+        return self.session.scalar(
+            select(WorkflowSnapshot).where(
+                WorkflowSnapshot.workflow_instance_id == workflow_instance_id
+            )
+        )
+
     def require_workflow_instance(self, instance_id: str) -> WorkflowInstance:
         instance = self.get_workflow_instance(instance_id)
         if instance is None:

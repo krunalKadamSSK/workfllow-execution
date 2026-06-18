@@ -50,6 +50,14 @@ class EventRepository(BaseRepository):
             ) from exc
         return event
 
+    def get_latest_event(self, workflow_instance_id: str) -> WorkflowEvent | None:
+        return self.session.scalar(
+            select(WorkflowEvent)
+            .where(WorkflowEvent.workflow_instance_id == workflow_instance_id)
+            .order_by(WorkflowEvent.sequence_number.desc())
+            .limit(1)
+        )
+
     def list_events(
         self, workflow_instance_id: str, *, after_sequence: int | None = None
     ) -> list[WorkflowEvent]:

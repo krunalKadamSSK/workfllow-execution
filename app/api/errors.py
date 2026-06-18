@@ -84,9 +84,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(FieldValidationError)
-    async def field_validation_handler(
-        request: Request, exc: FieldValidationError
-    ) -> JSONResponse:
+    async def field_validation_handler(request: Request, exc: FieldValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=_error_body(
@@ -98,9 +96,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(InputResolutionError)
-    async def input_resolution_handler(
-        request: Request, exc: InputResolutionError
-    ) -> JSONResponse:
+    async def input_resolution_handler(request: Request, exc: InputResolutionError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content=_error_body(
@@ -112,9 +108,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(NodeExecutionError)
-    async def node_execution_handler(
-        request: Request, exc: NodeExecutionError
-    ) -> JSONResponse:
+    async def node_execution_handler(request: Request, exc: NodeExecutionError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=_error_body(

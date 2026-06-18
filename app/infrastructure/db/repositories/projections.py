@@ -5,11 +5,60 @@ from typing import Any
 from sqlalchemy import select
 
 from app.infrastructure.db.models.instances import WorkflowNodeInstance
-from app.infrastructure.db.models.projections import WorkflowNodeProjection
+from app.infrastructure.db.models.projections import WorkflowNodeProjection, WorkflowProjection
 from app.infrastructure.db.repositories.base import BaseRepository
 
 
 class ProjectionRepository(BaseRepository):
+    def get_workflow_state(self, workflow_instance_id: str) -> dict[str, Any] | None:
+        return self.session.scalar(
+            select(WorkflowProjection.current_state_json).where(
+                WorkflowProjection.workflow_instance_id == workflow_instance_id
+            )
+        )
+
+    def upsert_workflow_projection(
+        self,
+        *,
+        workflow_instance_id: str,
+        current_state_json: dict[str, Any],
+    ) -> WorkflowProjection:
+        existing = self.session.scalar(
+            select(WorkflowProjection).where(
+                WorkflowProjection.workflow_instance_id == workflow_instance_id
+            )
+        )
+        if existing is not None:
+            existing.current_state_json = current_state_json
+            self.session.flush()
+            return existing
+
+        projection = WorkflowProjection(
+            workflow_instance_id=workflow_instance_id,
+            current_state_json=current_state_json,
+        )
+        self.session.add(projection)
+        self.session.flush()
+        return projection
+
+    def delete_projections_for_instance(self, workflow_instance_id: str) -> None:
+        workflow_projection = self.session.scalar(
+            select(WorkflowProjection).where(
+                WorkflowProjection.workflow_instance_id == workflow_instance_id
+            )
+        )
+        if workflow_projection is not None:
+            self.session.delete(workflow_projection)
+
+        node_projections = self.session.scalars(
+            select(WorkflowNodeProjection).where(
+                WorkflowNodeProjection.workflow_instance_id == workflow_instance_id
+            )
+        )
+        for projection in node_projections:
+            self.session.delete(projection)
+        self.session.flush()
+
     def get_node_values_by_graph_id(
         self,
         *,
