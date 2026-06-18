@@ -1,24 +1,3 @@
-import enum
+from app.domain.enums import ExecutionStatus, NodeStatus, WorkflowStatus
 
-
-class WorkflowStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    PAUSED = "PAUSED"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-
-
-class NodeStatus(str, enum.Enum):
-    WAITING = "WAITING"
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    INVALIDATED = "INVALIDATED"
-    FAILED = "FAILED"
-
-
-class ExecutionStatus(str, enum.Enum):
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
+__all__ = ["ExecutionStatus", "NodeStatus", "WorkflowStatus"]

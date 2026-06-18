@@ -35,6 +35,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "app/infrastructure/db/models/*.py" = ["F821", "UP042"]
+"app/domain/enums.py" = ["UP042"]
+"app/domain/events/types.py" = ["UP042"]
 "alembic/versions/*.py" = ["UP007", "UP035"]
 "app/core/logging.py" = ["UP017"]
 

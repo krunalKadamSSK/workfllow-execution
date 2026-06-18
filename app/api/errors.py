@@ -5,6 +5,10 @@ from pydantic import ValidationError as PydanticValidationError
 
 from app.domain.exceptions import (
     DuplicateSlugError,
+    FieldValidationError,
+    InputResolutionError,
+    InvalidTransitionError,
+    NodeExecutionError,
     NotFoundError,
     ValidationError,
     WorkflowEngineError,
@@ -57,6 +61,62 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def validation_handler(request: Request, exc: ValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_error_body(
+                code=exc.code,
+                message=exc.message,
+                request=request,
+                details=exc.details,
+            ),
+        )
+
+    @app.exception_handler(InvalidTransitionError)
+    async def invalid_transition_handler(
+        request: Request, exc: InvalidTransitionError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=_error_body(
+                code=exc.code,
+                message=exc.message,
+                request=request,
+                details=exc.details,
+            ),
+        )
+
+    @app.exception_handler(FieldValidationError)
+    async def field_validation_handler(
+        request: Request, exc: FieldValidationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=_error_body(
+                code=exc.code,
+                message=exc.message,
+                request=request,
+                details=exc.details,
+            ),
+        )
+
+    @app.exception_handler(InputResolutionError)
+    async def input_resolution_handler(
+        request: Request, exc: InputResolutionError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=_error_body(
+                code=exc.code,
+                message=exc.message,
+                request=request,
+                details=exc.details,
+            ),
+        )
+
+    @app.exception_handler(NodeExecutionError)
+    async def node_execution_handler(
+        request: Request, exc: NodeExecutionError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
             content=_error_body(
                 code=exc.code,
                 message=exc.message,

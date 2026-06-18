@@ -27,3 +27,22 @@ class SequenceConflictError(WorkflowEngineError):
 
 class ValidationError(WorkflowEngineError):
     code = "VALIDATION_ERROR"
+
+
+class InvalidTransitionError(WorkflowEngineError):
+    code = "INVALID_TRANSITION"
+
+
+class NodeExecutionError(WorkflowEngineError):
+    code = "NODE_EXECUTION_ERROR"
+
+
+class InputResolutionError(WorkflowEngineError):
+    code = "INPUT_RESOLUTION_ERROR"
+
+
+class FieldValidationError(WorkflowEngineError):
+    code = "FIELD_VALIDATION_FAILED"
+
+    def __init__(self, message: str, *, field_errors: list | None = None):
+        super().__init__(message, details=field_errors or [])
