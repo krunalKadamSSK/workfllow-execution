@@ -145,6 +145,7 @@ class TestUserInputExecutor:
                 "partName": "PART-1",
                 "meltLossPercentage": 5,
                 "rawWeight": 10,
+                "inputWeight": 15,
             },
         )
 
@@ -175,22 +176,12 @@ class TestUserInputExecutor:
                     "partName": "PART-1",
                     "meltLossPercentage": 5,
                     "rawWeight": 10,
+                    "inputWeight": 15,
                 },
             )
 
-    def test_prepare_exposes_remote_source_metadata(self, raw_material_definition: dict):
+    def test_prepare_sets_upstream_defaults(self, raw_material_definition: dict):
         executor = UserInputExecutor()
-        raw_material_definition["form"]["fields"].append(
-            {
-                "id": "rate",
-                "type": "number",
-                "label": "rate",
-                "remoteSource": {
-                    "url": "http://localhost:8000/rates?customer={{customerName}}",
-                    "resultPath": "0.rate",
-                },
-            }
-        )
         context = ExecutionContext(
             workflow_instance_id="inst-1",
             workflow_node_instance_id="node-inst-2",
@@ -198,8 +189,31 @@ class TestUserInputExecutor:
             node_definition_version_id="ver-2",
             base_kind="userInput",
             definition_json=raw_material_definition,
-            resolved_inputs={"customerName": "ACME"},
+            resolved_inputs={"customerName": "ACME", "partName": "PART-1"},
+            locked_input_keys=frozenset({"customerName", "partName"}),
         )
 
         prepared = executor.prepare(context)
-        assert prepared["__remoteSource.rate"]["url"].endswith("customer=ACME")
+        assert prepared == {"customerName": "ACME", "partName": "PART-1"}
+
+    def test_prepare_form_fields_adds_default_value_for_upstream_fields(
+        self, raw_material_definition: dict
+    ):
+        executor = UserInputExecutor()
+        context = ExecutionContext(
+            workflow_instance_id="inst-1",
+            workflow_node_instance_id="node-inst-2",
+            workflow_node_id="node-2",
+            node_definition_version_id="ver-2",
+            base_kind="userInput",
+            definition_json=raw_material_definition,
+            resolved_inputs={"customerName": "ACME", "partName": "PART-1"},
+            locked_input_keys=frozenset({"customerName", "partName"}),
+        )
+
+        fields = executor.prepare_form_fields(context)
+        by_id = {field["id"]: field for field in fields}
+
+        assert by_id["customerName"]["defaultValue"] == "ACME"
+        assert by_id["partName"]["defaultValue"] == "PART-1"
+        assert "defaultValue" not in by_id["meltLossPercentage"]

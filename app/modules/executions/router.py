@@ -7,6 +7,7 @@ from app.api.deps import get_session
 from app.application.executions.service import ExecutionService
 from app.domain.enums import NodeStatus
 from app.modules.executions.schemas import (
+    PendingNodeFormResponse,
     StartWorkflowRequest,
     SubmitNodeOutputsRequest,
     WorkflowEventResponse,
@@ -47,6 +48,10 @@ def _instance_response(state: dict) -> WorkflowInstanceResponse:
             for node in state["node_instances"]
             if node.status == NodeStatus.PENDING
         ],
+        pending_node_forms={
+            workflow_node_id: PendingNodeFormResponse(**form)
+            for workflow_node_id, form in state.get("pending_node_forms", {}).items()
+        },
         workflow_projection=state.get("workflow_projection"),
     )
 

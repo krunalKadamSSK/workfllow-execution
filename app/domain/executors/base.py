@@ -14,7 +14,30 @@ class BaseNodeExecutor:
         raise NotImplementedError
 
     def prepare(self, context: ExecutionContext) -> dict[str, Any]:
-        return dict(context.resolved_inputs)
+        fields = self._form_fields(context)
+        if not fields:
+            return dict(context.resolved_inputs)
+
+        defaults: dict[str, Any] = {}
+        for field in fields:
+            field_id = str(field["id"])
+            if field_id in context.resolved_inputs:
+                defaults[field_id] = context.resolved_inputs[field_id]
+        return defaults
+
+    def prepare_form_fields(self, context: ExecutionContext) -> list[dict[str, Any]]:
+        fields: list[dict[str, Any]] = []
+        for field in self._form_fields(context):
+            enriched = dict(field)
+            field_id = str(field["id"])
+            if field_id in context.resolved_inputs:
+                enriched["defaultValue"] = context.resolved_inputs[field_id]
+            fields.append(enriched)
+        return fields
+
+    @staticmethod
+    def _form_fields(context: ExecutionContext) -> list[dict[str, Any]]:
+        return context.definition_json.get("form", {}).get("fields", [])
 
     def validate_outputs(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
         return None

@@ -1,94 +1,66 @@
 # Workflow Execution Engine
 
-Python workflow execution engine using PostgreSQL, Redis, and SQLAlchemy.
+Python workflow execution engine with **event-sourced** runtime state, **versioned definitions**, and **synchronous** task execution.
 
-## Prerequisites
+**Stack:** FastAPI · SQLAlchemy 2.0 (sync) · PostgreSQL · Redis (readiness only)
 
-- Python 3.11+
-- Docker with **docker-compose** (standalone) or **docker compose** (v2 plugin)
-
-> **Docker Compose command:** this machine uses the standalone `docker-compose` binary (snap), not the `docker compose` v2 plugin. Use `docker-compose` (with a hyphen), or run `make up`.
-
-## Local setup
+## Quick start
 
 ```bash
-# 1. Environment
 cp .env.example .env
+make up && make migrate
 
-# 2. Start Postgres + Redis
-docker-compose up -d
-
-# 3. Python virtualenv
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+
+uvicorn app.main:app --reload --port 8000
 ```
 
-## Port conflicts
+- API docs: http://localhost:8000/docs
+- `GET /health` — liveness
+- `GET /ready` — PostgreSQL + Redis reachable
 
-If Redis or Postgres ports are already in use, set alternate ports in `.env`:
+## Documentation
 
-```bash
-REDIS_PORT=6380
-REDIS_URL=redis://localhost:6380/0
-```
+| Doc | Contents |
+|-----|----------|
+| **[Developer Guide](docs/DEVELOPER_GUIDE.md)** | Folder structure, architecture, runtime flow, API summary, where to change what |
+| [ADR-001](docs/adr/001-architecture-and-standards.md) | SOLID rules, design patterns, error taxonomy |
 
-Then restart: `docker-compose up -d`
-
-## Docker commands
-
-```bash
-docker-compose up -d          # start services (or: make up)
-docker-compose ps             # check status
-docker-compose logs -f        # tail logs
-docker-compose down           # stop services
-docker-compose down -v        # stop and remove volumes
-```
-
-### Install docker compose v2 plugin (optional)
-
-If you prefer `docker compose` (space, no hyphen):
+## Development
 
 ```bash
-sudo apt install docker-compose-v2
-```
-
-## Services
-
-| Service  | Port | Connection |
-|----------|------|------------|
-| Postgres | 5432 | `postgresql+psycopg://workflow:workflow@localhost:5432/workflow_engine` |
-| Redis    | 6379 | `redis://localhost:6379/0` |
-
-## Development commands
-
-```bash
-make install      # pip install -r requirements.txt
-make lint         # ruff check
+make check        # lint + unit tests
+make test-all     # includes integration tests (needs Postgres)
 make format       # ruff format
-make test         # pytest
-make check        # lint + test
-make pre-commit   # run all pre-commit hooks
+make pre-commit   # git hooks
 ```
 
-## Health endpoints
-
-| Endpoint   | Purpose |
-|------------|---------|
-| `GET /health` | Liveness — process is running |
-| `GET /ready`  | Readiness — PostgreSQL and Redis reachable (503 if not) |
-
-All responses include an `X-Request-ID` header for request correlation.
-
-## Database migrations
+### PostgreSQL
 
 ```bash
-make migrate                    # alembic upgrade head
-make migration msg='describe'   # autogenerate new revision (requires Postgres)
+make up && make migrate    # start DB + apply migrations
+make db-psql               # interactive psql shell
+make db-reset              # wipe data and re-migrate (destructive)
 ```
 
-Initial schema is in `alembic/versions/001_initial_workflow_schema.py`.
+Full reference: [docs/DEVELOPER_GUIDE.md — PostgreSQL](docs/DEVELOPER_GUIDE.md#postgresql)
 
-## Architecture
+## Services (docker-compose)
 
-See [docs/adr/001-architecture-and-standards.md](docs/adr/001-architecture-and-standards.md) for layer layout, SOLID rules, design patterns, and error taxonomy.
+| Service  | Default port |
+|----------|--------------|
+| Postgres | 5432 |
+| Redis    | 6379 |
+
+Override ports in `.env` if needed (`POSTGRES_PORT`, `REDIS_PORT`).
+
+## Demo workflow
+
+Publish fixtures from `tests/fixtures/`, start an instance, submit tasks in order:
+
+```
+start → General Information → Raw Material Pricing → end
+```
+
+See the [Developer Guide — Runtime flow](docs/DEVELOPER_GUIDE.md#runtime-flow-demo-workflow) for curl examples.

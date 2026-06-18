@@ -227,11 +227,57 @@ class WorkflowOrchestrator:
         instance = self._instances.require_workflow_instance(workflow_instance_id)
         node_instances = self._instances.list_node_instances(workflow_instance_id)
         workflow_state = self._projections.get_workflow_state(workflow_instance_id)
+        graph = self._load_graph(instance)
         return {
             "instance": instance,
             "node_instances": node_instances,
             "workflow_projection": workflow_state,
+            "pending_node_forms": self._prepare_pending_node_forms(
+                workflow_instance_id, node_instances, graph
+            ),
         }
+
+    def _prepare_pending_node_forms(
+        self,
+        workflow_instance_id: str,
+        node_instances: list[WorkflowNodeInstance],
+        graph: WorkflowGraph,
+    ) -> dict[str, dict[str, Any]]:
+        pending_forms: dict[str, dict[str, Any]] = {}
+
+        for node_instance in node_instances:
+            if node_instance.status != NodeStatus.PENDING:
+                continue
+
+            graph_node = graph.require_node(node_instance.workflow_node_id)
+            node_version = self._definitions.get_node_definition_version_by_id(
+                node_instance.node_definition_version_id
+            )
+            if node_version is None:
+                continue
+
+            definition_json = node_version.definition_json
+            resolved_inputs = self._input_binder.resolve(
+                workflow_instance_id=workflow_instance_id,
+                graph_node=graph_node,
+            )
+            executor = self._executors.get(definition_json["baseKind"])
+            context = ExecutionContext(
+                workflow_instance_id=workflow_instance_id,
+                workflow_node_instance_id=node_instance.id,
+                workflow_node_id=node_instance.workflow_node_id,
+                node_definition_version_id=node_instance.node_definition_version_id,
+                base_kind=definition_json["baseKind"],
+                definition_json=definition_json,
+                resolved_inputs=resolved_inputs.values,
+                locked_input_keys=resolved_inputs.locked_keys,
+                execution_number=node_instance.current_execution,
+            )
+            pending_forms[node_instance.workflow_node_id] = {
+                "fields": executor.prepare_form_fields(context),
+            }
+
+        return pending_forms
 
     def _change_workflow_status(
         self,

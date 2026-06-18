@@ -25,13 +25,20 @@ class NodeExecutor(Protocol):
     def base_kind(self) -> str: ...
 
     def prepare(self, context: ExecutionContext) -> dict[str, Any]:
-        """Build default outputs or prefilled values before user/system action."""
+        """Prefill output values for form fields wired to upstream tasks."""
+        ...
+
+    def prepare_form_fields(self, context: ExecutionContext) -> list[dict[str, Any]]:
+        """Return form fields with defaultValue when an upstream task supplies the value."""
+        ...
 
     def validate_outputs(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
-        """Validate submitted or computed outputs."""
+        """Validate submitted outputs."""
+        ...
 
     def complete(self, context: ExecutionContext, outputs: dict[str, Any]) -> dict[str, Any]:
-        """Finalize outputs after validation."""
+        """Return finalized outputs after validation."""
+        ...
 
 
 @runtime_checkable

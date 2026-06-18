@@ -74,6 +74,7 @@ class FormField(BaseModel):
     remoteSource: RemoteSource | None = None
     calculation: Calculation | None = None
     readOnly: bool = False
+    defaultValue: Any = None
     validation: list[ValidationRule] = Field(default_factory=list)
 
 

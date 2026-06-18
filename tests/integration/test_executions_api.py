@@ -45,6 +45,7 @@ class TestExecutionsAPI:
         instance_id = instance["id"]
         assert instance["status"] == "RUNNING"
         assert instance["pending_node_ids"] == [GENERAL_INFO_GRAPH_NODE]
+        assert GENERAL_INFO_GRAPH_NODE not in instance["pending_node_forms"]
 
         get_response = api_client.get(f"/api/v1/instances/{instance_id}")
         assert get_response.status_code == 200
@@ -63,6 +64,10 @@ class TestExecutionsAPI:
         )
         assert submit_one.status_code == 200
         assert submit_one.json()["pending_node_ids"] == [RAW_MATERIAL_GRAPH_NODE]
+        pricing_form = submit_one.json()["pending_node_forms"][RAW_MATERIAL_GRAPH_NODE]["fields"]
+        pricing_fields = {field["id"]: field for field in pricing_form}
+        assert pricing_fields["customerName"]["defaultValue"] == "ACME"
+        assert pricing_fields["partName"]["defaultValue"] == "PART-1"
 
         submit_two = api_client.post(
             f"/api/v1/instances/{instance_id}/nodes/{RAW_MATERIAL_GRAPH_NODE}/submit",
@@ -72,6 +77,7 @@ class TestExecutionsAPI:
                     "partName": "PART-1",
                     "meltLossPercentage": 5,
                     "rawWeight": 10,
+                    "inputWeight": 15,
                 }
             },
         )

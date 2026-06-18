@@ -63,7 +63,7 @@ app/
 
 - **ORM:** SQLAlchemy 2.0 (sync) with **psycopg3** driver
 - **Migrations:** Alembic
-- **Cache/queue:** Redis (Phase 8+)
+- **Redis:** readiness checks only (`GET /ready`); execution is synchronous in the API process
 
 Database URLs may be supplied as `postgresql://` or `postgresql+asyncpg://`; the app normalizes them to `postgresql+psycopg://` at startup.
 
@@ -123,7 +123,7 @@ All API errors use a consistent JSON shape:
 **Negative**
 
 - More packages and indirection early in the project
-- Sync SQLAlchemy limits async route handlers for DB work until a later async migration
+- Sync execution in the request thread — long-running node work blocks the HTTP response
 
 ## References
 

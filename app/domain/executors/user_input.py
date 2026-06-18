@@ -4,8 +4,6 @@ from typing import Any
 
 from app.domain.exceptions import FieldValidationError
 from app.domain.executors.base import BaseNodeExecutor
-from app.domain.executors.formula import FormulaError, evaluate_formula
-from app.domain.executors.remote_source import prepare_remote_source
 from app.domain.ports.executors import ExecutionContext
 from app.domain.validation.fields import FormFieldValidator
 
@@ -20,28 +18,13 @@ class UserInputExecutor(BaseNodeExecutor):
     def base_kind(self) -> str:
         return "userInput"
 
-    def prepare(self, context: ExecutionContext) -> dict[str, Any]:
-        prepared = dict(context.resolved_inputs)
-        fields = self._form_fields(context)
-
-        for field in fields:
-            remote = prepare_remote_source(field, prepared)
-            if remote is not None:
-                prepared[f"__remoteSource.{field['id']}"] = remote
-
-        return prepared
-
     def validate_outputs(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
         clean_outputs = self._strip_internal_keys(outputs)
         self._validate_locked_inputs(context, clean_outputs)
         self._field_validator.validate_form(self._form_fields(context), clean_outputs)
 
     def complete(self, context: ExecutionContext, outputs: dict[str, Any]) -> dict[str, Any]:
-        clean_outputs = self._strip_internal_keys(outputs)
-        return self._apply_calculations(self._form_fields(context), clean_outputs)
-
-    def _form_fields(self, context: ExecutionContext) -> list[dict[str, Any]]:
-        return context.definition_json.get("form", {}).get("fields", [])
+        return self._strip_internal_keys(outputs)
 
     def _validate_locked_inputs(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
         errors: list[dict[str, str]] = []
@@ -63,28 +46,6 @@ class UserInputExecutor(BaseNodeExecutor):
                 "Locked upstream inputs were modified",
                 field_errors=errors,
             )
-
-    def _apply_calculations(
-        self, fields: list[dict[str, Any]], values: dict[str, Any]
-    ) -> dict[str, Any]:
-        result = dict(values)
-        for _ in range(len(fields)):
-            changed = False
-            for field in fields:
-                calculation = field.get("calculation")
-                if not calculation:
-                    continue
-                field_id = str(field["id"])
-                try:
-                    computed = evaluate_formula(str(calculation["formula"]), result)
-                except FormulaError:
-                    continue
-                if result.get(field_id) != computed:
-                    result[field_id] = computed
-                    changed = True
-            if not changed:
-                break
-        return result
 
     @staticmethod
     def _strip_internal_keys(outputs: dict[str, Any]) -> dict[str, Any]:

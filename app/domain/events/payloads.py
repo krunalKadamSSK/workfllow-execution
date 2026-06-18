@@ -12,7 +12,7 @@ class WorkflowStartedPayload:
     snapshot_json: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        payload = {
+        payload: dict[str, Any] = {
             "workflow_instance_id": self.workflow_instance_id,
             "workflow_definition_id": self.workflow_definition_id,
             "workflow_definition_version_id": self.workflow_definition_version_id,

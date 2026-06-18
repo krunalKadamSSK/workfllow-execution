@@ -77,6 +77,7 @@ class TestWorkflowOrchestrator:
                 "partName": "PART-1",
                 "meltLossPercentage": 5,
                 "rawWeight": 10,
+                "inputWeight": 15,
             },
         )
         db_session.flush()

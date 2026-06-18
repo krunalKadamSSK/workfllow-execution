@@ -27,6 +27,10 @@ class WorkflowNodeInstanceResponse(BaseModel):
     current_execution: int
 
 
+class PendingNodeFormResponse(BaseModel):
+    fields: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class WorkflowInstanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -40,6 +44,7 @@ class WorkflowInstanceResponse(BaseModel):
     completed_at: datetime | None = None
     node_instances: list[WorkflowNodeInstanceResponse] = Field(default_factory=list)
     pending_node_ids: list[str] = Field(default_factory=list)
+    pending_node_forms: dict[str, PendingNodeFormResponse] = Field(default_factory=dict)
     workflow_projection: dict[str, Any] | None = None
 
 
