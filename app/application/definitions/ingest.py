@@ -46,6 +46,7 @@ class DefinitionIngestService:
         *,
         created_by: str | None = None,
     ) -> tuple[WorkflowDefinition, WorkflowDefinitionVersion]:
+        slug = payload.required_slug
         published_node_ids, node_output_fields = self._resolve_task_node_definitions(payload)
         issues = validate_workflow_definition(
             payload,
@@ -62,14 +63,14 @@ class DefinitionIngestService:
         if existing is not None:
             return self._publish_existing_workflow(existing, payload, created_by=created_by)
 
-        slug_owner = self._repo.get_workflow_definition_by_slug(payload.slug)
+        slug_owner = self._repo.get_workflow_definition_by_slug(slug)
         if slug_owner is not None:
-            raise DuplicateSlugError(f"Workflow definition slug already exists: {payload.slug}")
+            raise DuplicateSlugError(f"Workflow definition slug already exists: {slug}")
 
         return self._repo.create_workflow_definition(
             definition_id=payload.id,
             name=payload.name,
-            slug=payload.slug,
+            slug=slug,
             status=payload.status,
             definition_json=payload.to_stored_json(),
             created_by=created_by,
@@ -139,13 +140,14 @@ class DefinitionIngestService:
         *,
         created_by: str | None = None,
     ):
-        if existing.slug != payload.slug:
-            slug_owner = self._repo.get_workflow_definition_by_slug(payload.slug)
+        slug = payload.required_slug
+        if existing.slug != slug:
+            slug_owner = self._repo.get_workflow_definition_by_slug(slug)
             if slug_owner is not None and slug_owner.id != existing.id:
-                raise DuplicateSlugError(f"Workflow definition slug already exists: {payload.slug}")
+                raise DuplicateSlugError(f"Workflow definition slug already exists: {slug}")
 
         existing.name = payload.name
-        existing.slug = payload.slug
+        existing.slug = slug
         existing.status = payload.status
 
         version = self._repo.publish_workflow_version(

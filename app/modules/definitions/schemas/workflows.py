@@ -83,6 +83,12 @@ class WorkflowDefinitionIngest(BaseModel):
             raise ValueError("Workflow slug is required")
         return self
 
+    @property
+    def required_slug(self) -> str:
+        if not self.slug or not self.slug.strip():
+            raise ValueError("Workflow slug is required")
+        return self.slug.strip()
+
     def to_stored_json(self) -> dict:
         return WorkflowDefinitionJson(
             description=self.description,
