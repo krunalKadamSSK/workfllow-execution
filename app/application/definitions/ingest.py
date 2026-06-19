@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.domain.exceptions import DuplicateSlugError, NotFoundError, ValidationError
+from app.domain.validation.form_blueprint import validate_form_blueprint
 from app.domain.validation.pipeline import validate_workflow_definition
 from app.infrastructure.db.models import (
     NodeDefinition,
@@ -27,6 +28,16 @@ class DefinitionIngestService:
         created_by: str | None = None,
     ) -> tuple[NodeDefinition, NodeDefinitionVersion]:
         self._base_types.require_enabled_kind(payload.baseKind)
+
+        if payload.baseKind == "userInput":
+            form_issues = validate_form_blueprint(
+                payload.form.model_dump() if payload.form is not None else None
+            )
+            if form_issues:
+                raise ValidationError(
+                    "Node form blueprint validation failed",
+                    details=[issue.to_dict() for issue in form_issues],
+                )
 
         existing = self._repo.get_node_definition(payload.id)
         if existing is not None:

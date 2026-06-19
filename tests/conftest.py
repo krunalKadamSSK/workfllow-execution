@@ -67,7 +67,6 @@ def db_engine():
             session.add_all([BaseType(**row) for row in BASE_TYPES_SEED])
             session.commit()
     yield engine
-    Base.metadata.drop_all(engine)
     engine.dispose()
 
 

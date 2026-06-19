@@ -6,6 +6,8 @@ from typing import Any
 
 from app.core.config import settings
 
+_APP_LOGGERS = ("app", "uvicorn", "uvicorn.error", "uvicorn.access")
+
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -55,16 +57,19 @@ class JsonFormatter(logging.Formatter):
 
 
 def setup_logging() -> None:
-    root = logging.getLogger()
-    root.handlers.clear()
+    """Configure app log levels without replacing uvicorn's default access logging."""
+    level = settings.LOG_LEVEL.upper()
+
+    for name in _APP_LOGGERS:
+        logging.getLogger(name).setLevel(level)
+
+    if not settings.LOG_JSON:
+        return
 
     handler = logging.StreamHandler(sys.stdout)
-    if settings.LOG_JSON:
-        handler.setFormatter(JsonFormatter())
-    else:
-        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s"))
+    handler.setFormatter(JsonFormatter())
 
-    root.addHandler(handler)
-    root.setLevel(settings.LOG_LEVEL.upper())
-
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    for name in _APP_LOGGERS:
+        logger = logging.getLogger(name)
+        logger.handlers = [handler]
+        logger.propagate = False

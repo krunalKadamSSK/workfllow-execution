@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class IconConfig(BaseModel):
@@ -26,47 +26,81 @@ class AppearanceConfig(BaseModel):
     badge: str
 
 
+class FormMeta(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    formId: str
+    version: str
+
+
 class ValidationRule(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    rule: Literal["required", "min", "max", "pattern"]
+    rule: str
     message: str | None = None
     value: Any = None
 
 
 class SelectOption(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     label: str
-    value: str
+    value: str | int | float
 
 
 class RemoteOptions(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     url: str
-    labelKey: str
-    valueKey: str
+    resultPath: str | None = None
+    labelKey: str = "label"
+    valueKey: str = "value"
+    queryParam: str | None = None
+    debounceMs: int | None = None
+    minChars: int | None = None
+    requires: list[str] = Field(default_factory=list)
 
 
 class RemoteSource(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     url: str
     resultPath: str
+    requires: list[str] = Field(default_factory=list)
 
 
 class Calculation(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     formula: str
+
+    @field_validator("formula")
+    @classmethod
+    def formula_max_length(cls, value: str) -> str:
+        if len(value) > 500:
+            raise ValueError("formula must be at most 500 characters")
+        return value
+
+
+class FieldUiBehavior(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    closeOnOutsideClick: bool | None = None
+
+
+class CrossFieldConstraint(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    logic: str
+    target: str
+    message: str
 
 
 class FormField(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     id: str
-    type: Literal["text", "number", "select"]
+    type: str
     label: str
     placeholder: str | None = None
     options: list[SelectOption] | None = None
@@ -76,18 +110,23 @@ class FormField(BaseModel):
     readOnly: bool = False
     defaultValue: Any = None
     validation: list[ValidationRule] = Field(default_factory=list)
+    ui: FieldUiBehavior | None = None
 
 
 class FormConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    """Synapse NodeFormConfig — fields plus optional cross-field constraints."""
 
-    fields: list[FormField]
+    model_config = ConfigDict(extra="allow")
+
+    formMeta: FormMeta | None = None
+    fields: list[FormField] = Field(default_factory=list)
+    crossFieldConstraints: list[CrossFieldConstraint] = Field(default_factory=list)
 
 
 class NodeDefinitionJson(BaseModel):
     """JSON blob stored in node_definition_versions.definition_json."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     baseKind: Literal["userInput", "ai", "script"]
     appearance: AppearanceConfig

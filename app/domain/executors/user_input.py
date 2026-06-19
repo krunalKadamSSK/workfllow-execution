@@ -21,7 +21,12 @@ class UserInputExecutor(BaseNodeExecutor):
     def validate_outputs(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
         clean_outputs = self._strip_internal_keys(outputs)
         self._validate_locked_inputs(context, clean_outputs)
-        self._field_validator.validate_form(self._form_fields(context), clean_outputs)
+        form = context.definition_json.get("form", {})
+        self._field_validator.validate_form(
+            self._form_fields(context),
+            clean_outputs,
+            cross_field_constraints=form.get("crossFieldConstraints"),
+        )
 
     def complete(self, context: ExecutionContext, outputs: dict[str, Any]) -> dict[str, Any]:
         return self._strip_internal_keys(outputs)

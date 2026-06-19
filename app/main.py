@@ -7,7 +7,7 @@ from app.api.v1.health import router as health_router
 from app.core.config import settings
 from app.core.cors import setup_cors
 from app.core.logging import setup_logging
-from app.core.middleware import RequestContextMiddleware, RequestLoggingMiddleware
+from app.core.middleware import RequestContextMiddleware
 from app.modules.definitions.router import router as definitions_router
 from app.modules.executions.router import router as executions_router
 
@@ -24,7 +24,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RequestContextMiddleware)
 setup_cors(app)
 register_exception_handlers(app)
