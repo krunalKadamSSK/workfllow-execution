@@ -8,6 +8,7 @@
   },
   "baseKind": "userInput",
   "description": null,
+  "output": { "id": "inputWeight", "label": "Line total" },
   "form": {
     "fields": [
       {
@@ -42,7 +43,10 @@
         "type": "number",
         "label": "input weight",
         "readOnly": true,
-        "calculation": { "formula": "meltLossPercentage+rawWeight" }
+        "calculation": { "formula": "meltLossPercentage+rawWeight" },
+        "validation": [
+          { "rule": "required", "message": "Line total is required" }
+        ]
       }
     ]
   },

@@ -61,15 +61,19 @@ class NodeCompletedPayload:
     workflow_node_id: str
     execution_number: int
     outputs: dict[str, Any]
+    cost_contribution: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "workflow_instance_id": self.workflow_instance_id,
             "workflow_node_instance_id": self.workflow_node_instance_id,
             "workflow_node_id": self.workflow_node_id,
             "execution_number": self.execution_number,
             "outputs": self.outputs,
         }
+        if self.cost_contribution is not None:
+            payload["cost_contribution"] = self.cost_contribution
+        return payload
 
 
 @dataclasses.dataclass(frozen=True)

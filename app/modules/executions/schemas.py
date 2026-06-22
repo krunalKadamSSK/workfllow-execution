@@ -31,6 +31,20 @@ class PendingNodeFormResponse(BaseModel):
     fields: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ExecutionSummaryItem(BaseModel):
+    workflow_node_id: str
+    node_definition_id: str | None = None
+    task_label: str | None = None
+    output_key: str
+    output_label: str
+    value: Any = None
+
+
+class ExecutionSummary(BaseModel):
+    items: list[ExecutionSummaryItem] = Field(default_factory=list)
+    total: float | None = None
+
+
 class WorkflowInstanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +61,8 @@ class WorkflowInstanceResponse(BaseModel):
     next_task_id: str | None = None
     pending_node_forms: dict[str, PendingNodeFormResponse] = Field(default_factory=dict)
     workflow_projection: dict[str, Any] | None = None
+    execution_summary: ExecutionSummary | None = None
+    total_cost: float | None = None
 
 
 class WorkflowEventResponse(BaseModel):

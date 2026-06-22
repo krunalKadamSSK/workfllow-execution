@@ -7,6 +7,7 @@ from app.api.deps import get_session
 from app.application.executions.service import ExecutionService
 from app.domain.enums import NodeStatus
 from app.modules.executions.schemas import (
+    ExecutionSummary,
     PendingNodeFormResponse,
     StartWorkflowRequest,
     SubmitNodeOutputsRequest,
@@ -20,6 +21,20 @@ router = APIRouter(prefix="/instances", tags=["instances"])
 
 def get_execution_service(session: Session = Depends(get_session)) -> ExecutionService:
     return ExecutionService.from_session(session)
+
+
+def _current_total_cost(state: dict) -> float | None:
+    projection = state.get("workflow_projection") or {}
+    total = projection.get("total")
+    if isinstance(total, (int, float)) and not isinstance(total, bool):
+        return float(total)
+
+    summary = state.get("execution_summary") or {}
+    summary_total = summary.get("total")
+    if isinstance(summary_total, (int, float)) and not isinstance(summary_total, bool):
+        return float(summary_total)
+
+    return None
 
 
 def _instance_response(state: dict) -> WorkflowInstanceResponse:
@@ -55,6 +70,12 @@ def _instance_response(state: dict) -> WorkflowInstanceResponse:
             for workflow_node_id, form in state.get("pending_node_forms", {}).items()
         },
         workflow_projection=state.get("workflow_projection"),
+        execution_summary=(
+            ExecutionSummary(**state["execution_summary"])
+            if state.get("execution_summary") is not None
+            else None
+        ),
+        total_cost=_current_total_cost(state),
     )
 
 

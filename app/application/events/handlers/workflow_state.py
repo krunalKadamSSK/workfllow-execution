@@ -13,6 +13,7 @@ def initial_workflow_state() -> dict[str, Any]:
         "status": WorkflowStatus.PENDING.value,
         "last_sequence": 0,
         "nodes": {},
+        "total": None,
     }
 
 
@@ -64,14 +65,21 @@ def apply_workflow_projection_event(state: dict[str, Any], event: StoredEvent) -
         return next_state
 
     if event.event_type == WorkflowEventType.NODE_COMPLETED.value:
+        node_updates: dict[str, Any] = {
+            "workflow_node_instance_id": payload["workflow_node_instance_id"],
+            "status": "COMPLETED",
+            "execution_number": payload.get("execution_number"),
+            "outputs": payload.get("outputs", {}),
+        }
+        cost_contribution = payload.get("cost_contribution")
+        if cost_contribution is not None:
+            node_updates["cost_contribution"] = cost_contribution
         _upsert_node_state(
             next_state,
             workflow_node_id=payload["workflow_node_id"],
-            workflow_node_instance_id=payload["workflow_node_instance_id"],
-            status="COMPLETED",
-            execution_number=payload.get("execution_number"),
-            outputs=payload.get("outputs", {}),
+            **node_updates,
         )
+        _recompute_total(next_state)
         return next_state
 
     if event.event_type == WorkflowEventType.NODE_FAILED.value:
@@ -93,9 +101,25 @@ def apply_workflow_projection_event(state: dict[str, Any], event: StoredEvent) -
             status="INVALIDATED",
             reason=payload.get("reason"),
         )
+        _recompute_total(next_state)
         return next_state
 
     return next_state
+
+
+def _recompute_total(state: dict[str, Any]) -> None:
+    total = 0.0
+    found = False
+    for node in state.get("nodes", {}).values():
+        if node.get("status") != "COMPLETED":
+            continue
+        contribution = node.get("cost_contribution")
+        if isinstance(contribution, bool):
+            continue
+        if isinstance(contribution, (int, float)):
+            total += float(contribution)
+            found = True
+    state["total"] = total if found else None
 
 
 def _upsert_node_state(state: dict[str, Any], *, workflow_node_id: str, **updates: Any) -> None:

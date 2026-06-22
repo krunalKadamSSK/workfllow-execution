@@ -2,6 +2,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.domain.definitions.output_fields import collect_output_field_ids
+
 
 class IconConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -96,6 +98,13 @@ class CrossFieldConstraint(BaseModel):
     message: str
 
 
+class DeclaredOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    label: str
+
+
 class FormField(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -131,6 +140,7 @@ class NodeDefinitionJson(BaseModel):
     baseKind: Literal["userInput", "ai", "script"]
     appearance: AppearanceConfig
     description: str | None = None
+    output: DeclaredOutput | None = None
     form: FormConfig | None = None
 
 
@@ -147,6 +157,7 @@ class NodeDefinitionIngest(BaseModel):
     baseKind: Literal["userInput", "ai", "script"]
     appearance: AppearanceConfig
     description: str | None = None
+    output: DeclaredOutput | None = None
     form: FormConfig | None = None
 
     def to_stored_json(self) -> dict:
@@ -154,6 +165,7 @@ class NodeDefinitionIngest(BaseModel):
             baseKind=self.baseKind,
             appearance=self.appearance,
             description=self.description,
+            output=self.output,
             form=self.form,
         ).model_dump(exclude_none=True)
         if self.baseKind == "userInput" and "form" not in payload:
@@ -161,6 +173,4 @@ class NodeDefinitionIngest(BaseModel):
         return payload
 
     def output_field_ids(self) -> set[str]:
-        if self.form is None:
-            return set()
-        return {field.id for field in self.form.fields}
+        return collect_output_field_ids(self.to_stored_json())

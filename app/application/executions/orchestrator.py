@@ -6,7 +6,9 @@ from app.application.events.event_store import EventStore
 from app.application.executions.input_binder import GraphInputBinder
 from app.application.executions.instance_builder import WorkflowInstanceBuilder
 from app.application.executions.scheduler import GraphScheduler
+from app.application.executions.summary import build_execution_summary
 from app.application.executions.upstream_resolver import UpstreamInputResolver
+from app.domain.definitions.output_fields import cost_contribution
 from app.domain.enums import ExecutionStatus, NodeStatus, WorkflowStatus
 from app.domain.events.payloads import (
     NodeCompletedPayload,
@@ -184,6 +186,7 @@ class WorkflowOrchestrator:
                 workflow_node_id=workflow_node_id,
                 execution_number=node_instance.current_execution,
                 outputs=final_outputs,
+                cost_contribution=cost_contribution(definition_json, final_outputs),
             ).to_dict(),
             created_by=executed_by,
         )
@@ -237,6 +240,12 @@ class WorkflowOrchestrator:
             "instance": instance,
             "node_instances": node_instances,
             "workflow_projection": workflow_state,
+            "execution_summary": build_execution_summary(
+                graph=graph,
+                workflow_projection=workflow_state,
+                node_instances=node_instances,
+                definition_repository=self._definitions,
+            ),
             "pending_node_forms": self._prepare_pending_node_forms(
                 workflow_instance_id, node_instances, graph
             ),

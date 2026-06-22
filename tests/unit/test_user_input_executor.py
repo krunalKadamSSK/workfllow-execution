@@ -34,6 +34,7 @@ def raw_material_definition() -> dict:
         "baseKind": payload["baseKind"],
         "appearance": payload["appearance"],
         "description": payload.get("description"),
+        "output": payload.get("output"),
         "form": payload["form"],
     }
 
@@ -179,6 +180,79 @@ class TestUserInputExecutor:
                     "inputWeight": 15,
                 },
             )
+
+    def test_declared_output_required_when_configured(self, raw_material_definition: dict):
+        executor = UserInputExecutor()
+        context = ExecutionContext(
+            workflow_instance_id="inst-1",
+            workflow_node_instance_id="node-inst-2",
+            workflow_node_id="node-2",
+            node_definition_version_id="ver-2",
+            base_kind="userInput",
+            definition_json=raw_material_definition,
+        )
+
+        with pytest.raises(FieldValidationError) as exc_info:
+            executor.run(
+                context,
+                {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "meltLossPercentage": 5,
+                    "rawWeight": 10,
+                },
+            )
+        assert any(error["field"] == "inputWeight" for error in exc_info.value.details)
+
+    def test_declared_output_must_be_numeric(self, raw_material_definition: dict):
+        executor = UserInputExecutor()
+        context = ExecutionContext(
+            workflow_instance_id="inst-1",
+            workflow_node_instance_id="node-inst-2",
+            workflow_node_id="node-2",
+            node_definition_version_id="ver-2",
+            base_kind="userInput",
+            definition_json=raw_material_definition,
+        )
+
+        with pytest.raises(FieldValidationError) as exc_info:
+            executor.run(
+                context,
+                {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "meltLossPercentage": 5,
+                    "rawWeight": 10,
+                    "inputWeight": "15.5",
+                },
+            )
+        assert any(
+            error["field"] == "inputWeight" and error["rule"] == "number"
+            for error in exc_info.value.details
+        )
+
+    def test_declared_output_accepts_float(self, raw_material_definition: dict):
+        executor = UserInputExecutor()
+        context = ExecutionContext(
+            workflow_instance_id="inst-1",
+            workflow_node_instance_id="node-inst-2",
+            workflow_node_id="node-2",
+            node_definition_version_id="ver-2",
+            base_kind="userInput",
+            definition_json=raw_material_definition,
+        )
+
+        outputs = executor.run(
+            context,
+            {
+                "customerName": "ACME",
+                "partName": "PART-1",
+                "meltLossPercentage": 5,
+                "rawWeight": 10,
+                "inputWeight": 15.5,
+            },
+        )
+        assert outputs["inputWeight"] == 15.5
 
     def test_prepare_sets_upstream_defaults(self, raw_material_definition: dict):
         executor = UserInputExecutor()

@@ -46,7 +46,7 @@ class TestExecutionsAPI:
         assert instance["status"] == "RUNNING"
         assert instance["pending_node_ids"] == [GENERAL_INFO_GRAPH_NODE]
         assert instance["next_task_id"] == GENERAL_INFO_GRAPH_NODE
-        assert GENERAL_INFO_GRAPH_NODE not in instance["pending_node_forms"]
+        assert GENERAL_INFO_GRAPH_NODE in instance["pending_node_forms"]
 
         get_response = api_client.get(f"/api/v1/instances/{instance_id}")
         assert get_response.status_code == 200
@@ -94,6 +94,12 @@ class TestExecutionsAPI:
             ]
             == 15
         )
+        assert completed["workflow_projection"]["total"] == 15.0
+        assert completed["total_cost"] == 15.0
+        assert completed["execution_summary"]["total"] == 15.0
+        assert len(completed["execution_summary"]["items"]) == 1
+        assert completed["execution_summary"]["items"][0]["output_key"] == "inputWeight"
+        assert completed["execution_summary"]["items"][0]["value"] == 15
 
         events_response = api_client.get(f"/api/v1/instances/{instance_id}/events")
         assert events_response.status_code == 200

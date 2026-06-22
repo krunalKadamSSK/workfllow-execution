@@ -184,6 +184,11 @@ class FormFieldValidator:
                 return _field_error(field_id, "max", message)
             return None
 
+        if rule_name == "integer":
+            if isinstance(value, bool) or not isinstance(value, int):
+                return _field_error(field_id, "integer", message)
+            return None
+
         if rule_name in {"pattern", "regex"}:
             pattern = str(rule.get("value", ""))
             if len(pattern) > MAX_REGEX_PATTERN_LENGTH:

@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.domain.definitions.output_fields import collect_output_field_ids, validate_declared_output
 from app.domain.exceptions import DuplicateSlugError, NotFoundError, ValidationError
 from app.domain.validation.form_blueprint import validate_form_blueprint
 from app.domain.validation.pipeline import validate_workflow_definition
@@ -33,10 +34,11 @@ class DefinitionIngestService:
             form_issues = validate_form_blueprint(
                 payload.form.model_dump() if payload.form is not None else None
             )
-            if form_issues:
+            output_issues = validate_declared_output(payload.to_stored_json())
+            if form_issues or output_issues:
                 raise ValidationError(
                     "Node form blueprint validation failed",
-                    details=[issue.to_dict() for issue in form_issues],
+                    details=[issue.to_dict() for issue in form_issues + output_issues],
                 )
 
         existing = self._repo.get_node_definition(payload.id)
@@ -195,9 +197,6 @@ class DefinitionIngestService:
             if version is None:
                 continue
 
-            fields = version.definition_json.get("form", {}).get("fields", [])
-            node_output_fields[definition.id] = {
-                field["id"] for field in fields if isinstance(field, dict) and "id" in field
-            }
+            node_output_fields[definition.id] = collect_output_field_ids(version.definition_json)
 
         return published_node_ids, node_output_fields
