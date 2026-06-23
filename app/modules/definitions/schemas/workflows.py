@@ -34,6 +34,7 @@ class WorkflowNode(BaseModel):
     position: Position
     nodeDefinitionId: str | None = None
     label: str | None = None
+    name: str | None = None
     inputs: list[NodeInput] | None = None
 
     @model_validator(mode="after")
@@ -42,6 +43,8 @@ class WorkflowNode(BaseModel):
             raise ValueError("Task nodes must include nodeDefinitionId")
         if self.kind in {"start", "end"} and self.nodeDefinitionId:
             raise ValueError(f"{self.kind} nodes must not include nodeDefinitionId")
+        if self.kind == "task" and not self.label and self.name:
+            self.label = self.name
         return self
 
 

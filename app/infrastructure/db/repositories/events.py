@@ -69,6 +69,16 @@ class EventRepository(BaseRepository):
         query = query.order_by(WorkflowEvent.sequence_number.asc())
         return list(self.session.scalars(query))
 
+    def list_all_events(self) -> list[WorkflowEvent]:
+        return list(
+            self.session.scalars(
+                select(WorkflowEvent).order_by(
+                    WorkflowEvent.workflow_instance_id,
+                    WorkflowEvent.sequence_number,
+                )
+            )
+        )
+
     def get_event(self, event_id: str) -> WorkflowEvent | None:
         return self.session.get(WorkflowEvent, event_id)
 

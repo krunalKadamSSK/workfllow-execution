@@ -173,3 +173,29 @@ class InstanceRepository(BaseRepository):
         if instance is None:
             raise NotFoundError(f"Workflow instance not found: {instance_id}")
         return instance
+
+    def list_node_executions(self, workflow_instance_id: str) -> list[WorkflowNodeExecution]:
+        return list(
+            self.session.scalars(
+                select(WorkflowNodeExecution)
+                .where(WorkflowNodeExecution.workflow_instance_id == workflow_instance_id)
+                .order_by(WorkflowNodeExecution.started_at)
+            )
+        )
+
+    def list_workflow_instances(self) -> list[WorkflowInstance]:
+        return list(
+            self.session.scalars(
+                select(WorkflowInstance).order_by(WorkflowInstance.created_at.desc())
+            )
+        )
+
+    def list_all_node_instances(self) -> list[WorkflowNodeInstance]:
+        return list(self.session.scalars(select(WorkflowNodeInstance)))
+
+    def list_all_node_executions(self) -> list[WorkflowNodeExecution]:
+        return list(
+            self.session.scalars(
+                select(WorkflowNodeExecution).order_by(WorkflowNodeExecution.started_at)
+            )
+        )

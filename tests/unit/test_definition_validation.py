@@ -105,3 +105,15 @@ class TestWorkflowValidationPipeline:
     def test_missing_node_reference_fails(self, test_workflow: WorkflowDefinitionIngest):
         issues = validate_node_references(test_workflow, published_node_ids=set())
         assert any(issue.code == "UNKNOWN_NODE_DEFINITION" for issue in issues)
+
+
+def test_workflow_task_node_name_is_stored_as_label():
+    payload = load_json("workflow_test.json")
+    task_node = payload["nodes"][1]
+    task_node.pop("label", None)
+    task_node["name"] = "General information"
+
+    workflow = WorkflowDefinitionIngest.model_validate(payload)
+    stored_task = workflow.to_stored_json()["nodes"][1]
+
+    assert stored_task["label"] == "General information"

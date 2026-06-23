@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.domain.graph import WorkflowGraph
+from app.domain.graph.workflow_graph import GraphNode
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -112,3 +113,15 @@ class TestWorkflowGraph:
     def test_missing_node_raises(self, workflow_graph: WorkflowGraph):
         with pytest.raises(KeyError):
             workflow_graph.require_node("missing")
+
+
+def test_graph_node_reads_name_field_as_label():
+    node = GraphNode.from_dict(
+        {
+            "id": "task-1",
+            "kind": "task",
+            "nodeDefinitionId": "def-1",
+            "name": "Custom step name",
+        }
+    )
+    assert node.label == "Custom step name"

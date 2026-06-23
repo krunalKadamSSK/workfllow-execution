@@ -46,6 +46,16 @@ class TestExecutionsAPI:
         assert instance["status"] == "RUNNING"
         assert instance["pending_node_ids"] == [GENERAL_INFO_GRAPH_NODE]
         assert instance["next_task_id"] == GENERAL_INFO_GRAPH_NODE
+        assert instance["next_task_name"] == "General information"
+        assert instance["current_task"] == {
+            "id": GENERAL_INFO_GRAPH_NODE,
+            "name": "General information",
+        }
+        assert instance["task_names"][GENERAL_INFO_GRAPH_NODE] == "General information"
+        assert (
+            instance["pending_node_forms"][GENERAL_INFO_GRAPH_NODE]["task_name"]
+            == "General information"
+        )
         assert GENERAL_INFO_GRAPH_NODE in instance["pending_node_forms"]
 
         get_response = api_client.get(f"/api/v1/instances/{instance_id}")
@@ -66,8 +76,10 @@ class TestExecutionsAPI:
         assert submit_one.status_code == 200
         assert submit_one.json()["pending_node_ids"] == [RAW_MATERIAL_GRAPH_NODE]
         assert submit_one.json()["next_task_id"] == RAW_MATERIAL_GRAPH_NODE
-        pricing_form = submit_one.json()["pending_node_forms"][RAW_MATERIAL_GRAPH_NODE]["fields"]
-        pricing_fields = {field["id"]: field for field in pricing_form}
+        assert submit_one.json()["next_task_name"] == "Raw Material Pricing"
+        pricing_form = submit_one.json()["pending_node_forms"][RAW_MATERIAL_GRAPH_NODE]
+        assert pricing_form["task_name"] == "Raw Material Pricing"
+        pricing_fields = {field["id"]: field for field in pricing_form["fields"]}
         assert pricing_fields["customerName"]["defaultValue"] == "ACME"
         assert pricing_fields["partName"]["defaultValue"] == "PART-1"
 
@@ -98,8 +110,25 @@ class TestExecutionsAPI:
         assert completed["total_cost"] == 15.0
         assert completed["execution_summary"]["total"] == 15.0
         assert len(completed["execution_summary"]["items"]) == 1
+        assert completed["execution_summary"]["items"][0]["task_name"] == "Raw Material Pricing"
         assert completed["execution_summary"]["items"][0]["output_key"] == "inputWeight"
         assert completed["execution_summary"]["items"][0]["value"] == 15
+
+        export_response = api_client.get(f"/api/v1/instances/{instance_id}/export")
+        assert export_response.status_code == 200
+        assert (
+            export_response.headers["content-type"]
+            == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        assert export_response.content[:2] == b"PK"
+        assert "attachment" in export_response.headers.get("content-disposition", "")
+
+        all_export_response = api_client.get("/api/v1/instances/export")
+        assert all_export_response.status_code == 200
+        assert all_export_response.content[:2] == b"PK"
+        assert "workflow-executions-export.xlsx" in all_export_response.headers.get(
+            "content-disposition", ""
+        )
 
         events_response = api_client.get(f"/api/v1/instances/{instance_id}/events")
         assert events_response.status_code == 200

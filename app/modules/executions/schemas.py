@@ -25,15 +25,18 @@ class WorkflowNodeInstanceResponse(BaseModel):
     node_definition_version_id: str
     status: str
     current_execution: int
+    task_name: str | None = None
 
 
 class PendingNodeFormResponse(BaseModel):
+    task_name: str | None = None
     fields: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ExecutionSummaryItem(BaseModel):
     workflow_node_id: str
     node_definition_id: str | None = None
+    task_name: str | None = None
     task_label: str | None = None
     output_key: str
     output_label: str
@@ -43,6 +46,11 @@ class ExecutionSummaryItem(BaseModel):
 class ExecutionSummary(BaseModel):
     items: list[ExecutionSummaryItem] = Field(default_factory=list)
     total: float | None = None
+
+
+class CurrentTaskResponse(BaseModel):
+    id: str
+    name: str
 
 
 class WorkflowInstanceResponse(BaseModel):
@@ -58,7 +66,10 @@ class WorkflowInstanceResponse(BaseModel):
     completed_at: datetime | None = None
     node_instances: list[WorkflowNodeInstanceResponse] = Field(default_factory=list)
     pending_node_ids: list[str] = Field(default_factory=list)
+    current_task: CurrentTaskResponse | None = None
     next_task_id: str | None = None
+    next_task_name: str | None = None
+    task_names: dict[str, str] = Field(default_factory=dict)
     pending_node_forms: dict[str, PendingNodeFormResponse] = Field(default_factory=dict)
     workflow_projection: dict[str, Any] | None = None
     execution_summary: ExecutionSummary | None = None

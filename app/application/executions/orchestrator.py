@@ -7,6 +7,7 @@ from app.application.executions.input_binder import GraphInputBinder
 from app.application.executions.instance_builder import WorkflowInstanceBuilder
 from app.application.executions.scheduler import GraphScheduler
 from app.application.executions.summary import build_execution_summary
+from app.application.executions.task_names import build_task_names, resolve_task_name
 from app.application.executions.upstream_resolver import UpstreamInputResolver
 from app.domain.definitions.output_fields import cost_contribution
 from app.domain.enums import ExecutionStatus, NodeStatus, WorkflowStatus
@@ -236,6 +237,14 @@ class WorkflowOrchestrator:
         node_instances = self._instances.list_node_instances(workflow_instance_id)
         workflow_state = self._projections.get_workflow_state(workflow_instance_id)
         graph = self._load_graph(instance)
+        task_names = build_task_names(
+            graph=graph,
+            node_instances=node_instances,
+            definition_repository=self._definitions,
+        )
+        next_task_id = self._resolve_next_task_id(
+            graph, node_instances, after_task_id=after_task_id
+        )
         return {
             "instance": instance,
             "node_instances": node_instances,
@@ -246,11 +255,11 @@ class WorkflowOrchestrator:
                 node_instances=node_instances,
                 definition_repository=self._definitions,
             ),
+            "task_names": task_names,
+            "next_task_id": next_task_id,
+            "next_task_name": task_names.get(next_task_id) if next_task_id else None,
             "pending_node_forms": self._prepare_pending_node_forms(
                 workflow_instance_id, node_instances, graph
-            ),
-            "next_task_id": self._resolve_next_task_id(
-                graph, node_instances, after_task_id=after_task_id
             ),
         }
 
@@ -320,6 +329,10 @@ class WorkflowOrchestrator:
                 execution_number=node_instance.current_execution,
             )
             pending_forms[node_instance.workflow_node_id] = {
+                "task_name": resolve_task_name(
+                    graph_node=graph_node,
+                    definition_json=definition_json,
+                ),
                 "fields": executor.prepare_form_fields(context),
             }
 
@@ -447,6 +460,72 @@ class WorkflowOrchestrator:
             self._advance(instance, graph)
 
         return invalidated
+
+    def export_instance_excel(self, workflow_instance_id: str) -> tuple[bytes, str]:
+        from app.application.executions.export import (
+            build_instance_excel_export,
+            safe_export_filename,
+        )
+
+        state = self.get_instance_state(workflow_instance_id)
+        instance = state["instance"]
+        executions = self._instances.list_node_executions(workflow_instance_id)
+        events = self._events.list_workflow_events(workflow_instance_id)
+        workflow_definition = self._definitions.get_workflow_definition(
+            instance.workflow_definition_id
+        )
+        content = build_instance_excel_export(
+            instance=instance,
+            state=state,
+            executions=executions,
+            events=events,
+            workflow_definition_name=(
+                workflow_definition.name if workflow_definition is not None else None
+            ),
+        )
+        return content, f"{safe_export_filename(instance.name)}.xlsx"
+
+    def export_all_instances_excel(self) -> tuple[bytes, str]:
+        from app.application.executions.export import (
+            ALL_EXPORT_FILENAME,
+            InstanceExportContext,
+            build_all_instances_excel_export,
+        )
+
+        instances = self._instances.list_workflow_instances()
+        executions_by_instance: dict[str, list] = {}
+        for execution in self._instances.list_all_node_executions():
+            executions_by_instance.setdefault(execution.workflow_instance_id, []).append(
+                execution
+            )
+
+        events_by_instance: dict[str, list] = {}
+        for event in self._events.list_all_workflow_events():
+            events_by_instance.setdefault(event.workflow_instance_id, []).append(event)
+
+        workflow_names: dict[str, str | None] = {}
+        contexts: list[InstanceExportContext] = []
+        for instance in instances:
+            if instance.workflow_definition_id not in workflow_names:
+                definition = self._definitions.get_workflow_definition(
+                    instance.workflow_definition_id
+                )
+                workflow_names[instance.workflow_definition_id] = (
+                    definition.name if definition is not None else None
+                )
+
+            contexts.append(
+                InstanceExportContext(
+                    instance=instance,
+                    state=self.get_instance_state(instance.id),
+                    executions=executions_by_instance.get(instance.id, []),
+                    events=events_by_instance.get(instance.id, []),
+                    workflow_definition_name=workflow_names[instance.workflow_definition_id],
+                )
+            )
+
+        content = build_all_instances_excel_export(contexts)
+        return content, ALL_EXPORT_FILENAME
 
     def _load_graph(self, instance: WorkflowInstance) -> WorkflowGraph:
         snapshot = self._instances.get_snapshot(instance.id)

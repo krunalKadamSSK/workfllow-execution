@@ -66,3 +66,13 @@ class EventStore:
                 workflow_instance_id, after_sequence=after_sequence
             )
         ]
+
+    def list_workflow_events(
+        self, workflow_instance_id: str, *, after_sequence: int | None = None
+    ):
+        return self._events.list_events(
+            workflow_instance_id, after_sequence=after_sequence
+        )
+
+    def list_all_workflow_events(self):
+        return self._events.list_all_events()

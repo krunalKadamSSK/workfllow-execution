@@ -51,11 +51,13 @@ class GraphNode:
         if kind == "task" and not node_definition_id:
             raise ValueError(f"Task node '{data['id']}' must include nodeDefinitionId")
 
+        label = data.get("label") or data.get("name")
+
         return cls(
             id=str(data["id"]),
             kind=kind,
             node_definition_id=str(node_definition_id) if node_definition_id else None,
-            label=data.get("label"),
+            label=label if isinstance(label, str) and label else None,
             inputs=inputs,
         )
 

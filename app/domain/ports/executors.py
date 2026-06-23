@@ -40,6 +40,10 @@ class NodeExecutor(Protocol):
         """Return finalized outputs after validation."""
         ...
 
+    def run(self, context: ExecutionContext, outputs: dict[str, Any]) -> dict[str, Any]:
+        """Merge defaults, validate, and return finalized outputs."""
+        ...
+
 
 @runtime_checkable
 class InputResolver(Protocol):

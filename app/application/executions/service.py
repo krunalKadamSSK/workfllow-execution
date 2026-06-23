@@ -116,6 +116,12 @@ class ExecutionService:
     def list_events(self, workflow_instance_id: str):
         return self._event_repository.list_events(workflow_instance_id)
 
+    def export_instance_excel(self, workflow_instance_id: str) -> tuple[bytes, str]:
+        return self._orchestrator.export_instance_excel(workflow_instance_id)
+
+    def export_all_instances_excel(self) -> tuple[bytes, str]:
+        return self._orchestrator.export_all_instances_excel()
+
     def invalidate_downstream(
         self,
         *,

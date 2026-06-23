@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_session
 from app.application.executions.service import ExecutionService
 from app.domain.enums import NodeStatus
 from app.modules.executions.schemas import (
+    CurrentTaskResponse,
     ExecutionSummary,
     PendingNodeFormResponse,
     StartWorkflowRequest,
@@ -44,6 +46,13 @@ def _instance_response(state: dict) -> WorkflowInstanceResponse:
         for node in state["node_instances"]
         if node.status == NodeStatus.PENDING
     ]
+    task_names = state.get("task_names") or {}
+    next_task_id = state.get("next_task_id")
+    next_task_name = state.get("next_task_name")
+    current_task = None
+    if next_task_id and next_task_name:
+        current_task = CurrentTaskResponse(id=next_task_id, name=next_task_name)
+
     return WorkflowInstanceResponse(
         id=instance.id,
         name=instance.name,
@@ -60,11 +69,15 @@ def _instance_response(state: dict) -> WorkflowInstanceResponse:
                 node_definition_version_id=node.node_definition_version_id,
                 status=node.status.value,
                 current_execution=node.current_execution,
+                task_name=task_names.get(node.workflow_node_id),
             )
             for node in state["node_instances"]
         ],
         pending_node_ids=pending_node_ids,
-        next_task_id=state.get("next_task_id"),
+        current_task=current_task,
+        next_task_id=next_task_id,
+        next_task_name=next_task_name,
+        task_names=task_names,
         pending_node_forms={
             workflow_node_id: PendingNodeFormResponse(**form)
             for workflow_node_id, form in state.get("pending_node_forms", {}).items()
@@ -94,6 +107,31 @@ def start_workflow(
     session.commit()
     state = service.get_instance_state(instance.id)
     return _instance_response(state)
+
+
+@router.get("/export")
+def export_all_instances(
+    service: ExecutionService = Depends(get_execution_service),
+) -> Response:
+    content, filename = service.export_all_instances_excel()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{instance_id}/export")
+def export_instance(
+    instance_id: str,
+    service: ExecutionService = Depends(get_execution_service),
+) -> Response:
+    content, filename = service.export_instance_excel(instance_id)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{instance_id}", response_model=WorkflowInstanceResponse)

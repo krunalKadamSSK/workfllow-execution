@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.application.executions.task_names import resolve_task_name
 from app.domain.definitions.output_fields import declared_output
 from app.domain.graph.workflow_graph import WorkflowGraph
 from app.infrastructure.db.models.instances import WorkflowNodeInstance
@@ -47,7 +48,14 @@ def build_execution_summary(
             {
                 "workflow_node_id": graph_node.id,
                 "node_definition_id": graph_node.node_definition_id,
-                "task_label": graph_node.label or version.definition_json.get("name"),
+                "task_name": resolve_task_name(
+                    graph_node=graph_node,
+                    definition_json=version.definition_json,
+                ),
+                "task_label": resolve_task_name(
+                    graph_node=graph_node,
+                    definition_json=version.definition_json,
+                ),
                 "output_key": output_decl["id"],
                 "output_label": output_decl["label"],
                 "value": outputs.get(output_decl["id"]),
