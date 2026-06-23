@@ -2,12 +2,12 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: workflow_engine_postgres
+    # Host network avoids broken docker-proxy port forwarding on some Linux setups.
+    network_mode: host
     environment:
       POSTGRES_USER: workflow
       POSTGRES_PASSWORD: workflow
       POSTGRES_DB: workflow_engine
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

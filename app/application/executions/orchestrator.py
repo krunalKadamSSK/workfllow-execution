@@ -254,6 +254,7 @@ class WorkflowOrchestrator:
                 workflow_projection=workflow_state,
                 node_instances=node_instances,
                 definition_repository=self._definitions,
+                task_names=task_names,
             ),
             "task_names": task_names,
             "next_task_id": next_task_id,
@@ -328,10 +329,16 @@ class WorkflowOrchestrator:
                 locked_input_keys=resolved_inputs.locked_keys,
                 execution_number=node_instance.current_execution,
             )
+            node_definition = (
+                self._definitions.get_node_definition(graph_node.node_definition_id)
+                if graph_node.node_definition_id
+                else None
+            )
             pending_forms[node_instance.workflow_node_id] = {
                 "task_name": resolve_task_name(
                     graph_node=graph_node,
                     definition_json=definition_json,
+                    definition_name=node_definition.name if node_definition else None,
                 ),
                 "fields": executor.prepare_form_fields(context),
             }

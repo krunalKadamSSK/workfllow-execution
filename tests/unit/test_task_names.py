@@ -22,6 +22,14 @@ def test_resolve_task_name_falls_back_to_graph_node_id():
     assert resolve_task_name(graph_node=node) == "node-1"
 
 
+def test_resolve_task_name_falls_back_to_node_definition_name():
+    node = GraphNode(id="node-1", kind="task", node_definition_id="def-1")
+    assert (
+        resolve_task_name(graph_node=node, definition_name="Raw Material Pricing")
+        == "Raw Material Pricing"
+    )
+
+
 def test_resolve_task_name_uses_workflow_node_name_field():
     node = GraphNode(
         id="node-1",
@@ -43,13 +51,27 @@ class _NodeInstance:
         self.node_definition_version_id = version_id
 
 
+class _NodeDefinition:
+    def __init__(self, name: str):
+        self.name = name
+
+
 class _DefinitionRepository:
-    def __init__(self, versions: dict[str, dict]):
+    def __init__(
+        self,
+        versions: dict[str, dict],
+        definitions: dict[str, str] | None = None,
+    ):
         self._versions = versions
+        self._definitions = definitions or {}
 
     def get_node_definition_version_by_id(self, version_id: str):
         payload = self._versions.get(version_id)
         return _Version(payload) if payload is not None else None
+
+    def get_node_definition(self, definition_id: str):
+        name = self._definitions.get(definition_id)
+        return _NodeDefinition(name) if name is not None else None
 
 
 def test_build_task_names_maps_all_tasks():
@@ -72,7 +94,10 @@ def test_build_task_names_maps_all_tasks():
             ],
         }
     )
-    repo = _DefinitionRepository({"ver-1": {"name": "Raw Material Pricing"}})
+    repo = _DefinitionRepository(
+        {"ver-1": {"baseKind": "userInput"}},
+        definitions={"def-1": "Raw Material Pricing"},
+    )
     names = build_task_names(
         graph=graph,
         node_instances=[_NodeInstance("task-1", "ver-1")],

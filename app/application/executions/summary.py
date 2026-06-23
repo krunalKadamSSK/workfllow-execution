@@ -15,6 +15,7 @@ def build_execution_summary(
     workflow_projection: dict[str, Any] | None,
     node_instances: list[WorkflowNodeInstance],
     definition_repository: DefinitionRepository,
+    task_names: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build per-task cost line items and total from the workflow projection."""
     if workflow_projection is None:
@@ -44,18 +45,24 @@ def build_execution_summary(
             continue
 
         outputs = node_state.get("outputs", {})
+        task_name = (task_names or {}).get(graph_node.id)
+        if not task_name:
+            node_definition = (
+                definition_repository.get_node_definition(graph_node.node_definition_id)
+                if graph_node.node_definition_id
+                else None
+            )
+            task_name = resolve_task_name(
+                graph_node=graph_node,
+                definition_json=version.definition_json,
+                definition_name=node_definition.name if node_definition else None,
+            )
         items.append(
             {
                 "workflow_node_id": graph_node.id,
                 "node_definition_id": graph_node.node_definition_id,
-                "task_name": resolve_task_name(
-                    graph_node=graph_node,
-                    definition_json=version.definition_json,
-                ),
-                "task_label": resolve_task_name(
-                    graph_node=graph_node,
-                    definition_json=version.definition_json,
-                ),
+                "task_name": task_name,
+                "task_label": task_name,
                 "output_key": output_decl["id"],
                 "output_label": output_decl["label"],
                 "value": outputs.get(output_decl["id"]),

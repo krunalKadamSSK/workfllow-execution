@@ -11,6 +11,7 @@ def resolve_task_name(
     *,
     graph_node: GraphNode,
     definition_json: dict[str, Any] | None = None,
+    definition_name: str | None = None,
 ) -> str:
     """Return a human-readable task name for display in the UI."""
     if graph_node.label:
@@ -19,7 +20,19 @@ def resolve_task_name(
         name = definition_json.get("name")
         if isinstance(name, str) and name:
             return name
+    if definition_name:
+        return definition_name
     return graph_node.id
+
+
+def _node_definition_name(
+    graph_node: GraphNode,
+    definition_repository: DefinitionRepository,
+) -> str | None:
+    if not graph_node.node_definition_id:
+        return None
+    node_definition = definition_repository.get_node_definition(graph_node.node_definition_id)
+    return node_definition.name if node_definition is not None else None
 
 
 def build_task_names(
@@ -45,6 +58,7 @@ def build_task_names(
         names[graph_node.id] = resolve_task_name(
             graph_node=graph_node,
             definition_json=definition_json,
+            definition_name=_node_definition_name(graph_node, definition_repository),
         )
 
     return names

@@ -4,7 +4,7 @@ POSTGRES_CONTAINER := workflow_engine_postgres
 
 .PHONY: up down ps logs install lint format test check pre-commit
 .PHONY: migrate migration migrate-down migrate-current migrate-history
-.PHONY: db-psql db-logs db-reset db-wait
+.PHONY: db-psql db-logs db-reset db-wait db-restart
 
 up:
 	$(COMPOSE) up -d
@@ -52,6 +52,11 @@ db-wait:
 	@echo "Waiting for PostgreSQL..."
 	@until docker exec $(POSTGRES_CONTAINER) pg_isready -U workflow -d workflow_engine >/dev/null 2>&1; do sleep 1; done
 	@echo "PostgreSQL is ready."
+
+db-restart:
+	$(COMPOSE) down
+	$(COMPOSE) up -d postgres
+	$(MAKE) db-wait
 
 db-psql:
 	docker exec -it $(POSTGRES_CONTAINER) psql -U workflow -d workflow_engine
