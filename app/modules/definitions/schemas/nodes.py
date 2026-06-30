@@ -132,16 +132,35 @@ class FormConfig(BaseModel):
     crossFieldConstraints: list[CrossFieldConstraint] = Field(default_factory=list)
 
 
+class TableSummaryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    columnId: str
+    outputKey: str
+    label: str | None = None
+
+
+class TableConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    columns: list[FormField]
+    outputKey: str
+    summary: TableSummaryConfig | None = None
+    minRows: int = 1
+    crossFieldConstraints: list[CrossFieldConstraint] = Field(default_factory=list)
+
+
 class NodeDefinitionJson(BaseModel):
     """JSON blob stored in node_definition_versions.definition_json."""
 
     model_config = ConfigDict(extra="allow")
 
-    baseKind: Literal["userInput", "ai", "script"]
+    baseKind: Literal["userInput", "ai", "script", "table"]
     appearance: AppearanceConfig
     description: str | None = None
     output: DeclaredOutput | None = None
     form: FormConfig | None = None
+    table: TableConfig | None = None
 
 
 class NodeDefinitionIngest(BaseModel):
@@ -154,23 +173,36 @@ class NodeDefinitionIngest(BaseModel):
     slug: str
     status: str
     version: str | int
-    baseKind: Literal["userInput", "ai", "script"]
+    baseKind: Literal["userInput", "ai", "script", "table"]
     appearance: AppearanceConfig
     description: str | None = None
     output: DeclaredOutput | None = None
     form: FormConfig | None = None
+    table: TableConfig | None = None
 
     def to_stored_json(self) -> dict:
-        payload: dict = NodeDefinitionJson(
+        if self.baseKind == "table":
+            if self.table is None:
+                raise ValueError("table baseKind requires a table configuration block")
+            payload: dict = {
+                "baseKind": self.baseKind,
+                "appearance": self.appearance.model_dump(),
+                "table": self.table.model_dump(),
+            }
+            if self.description is not None:
+                payload["description"] = self.description
+            return payload
+
+        stored = NodeDefinitionJson(
             baseKind=self.baseKind,
             appearance=self.appearance,
             description=self.description,
             output=self.output,
             form=self.form,
         ).model_dump(exclude_none=True)
-        if self.baseKind == "userInput" and "form" not in payload:
-            payload["form"] = FormConfig().model_dump()
-        return payload
+        if self.baseKind == "userInput" and "form" not in stored:
+            stored["form"] = FormConfig().model_dump()
+        return stored
 
     def output_field_ids(self) -> set[str]:
         return collect_output_field_ids(self.to_stored_json())

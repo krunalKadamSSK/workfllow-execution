@@ -25,4 +25,12 @@ BASE_TYPES_SEED: list[dict] = [
         "enabled": True,
         "version": "1",
     },
+    {
+        "id": "6a30f2cc1adf6e10e72bcf94",
+        "kind": "table",
+        "display_name": "Table task",
+        "description": "Dynamic row collection filled at run time",
+        "enabled": True,
+        "version": "1",
+    },
 ]

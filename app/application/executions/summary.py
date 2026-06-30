@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.application.executions.task_names import resolve_task_name
-from app.domain.definitions.output_fields import declared_output
+from app.domain.definitions.output_fields import declared_output, table_summary_output
 from app.domain.graph.workflow_graph import WorkflowGraph
 from app.infrastructure.db.models.instances import WorkflowNodeInstance
 from app.infrastructure.db.repositories.definitions import DefinitionRepository
@@ -41,6 +41,8 @@ def build_execution_summary(
             continue
 
         output_decl = declared_output(version.definition_json)
+        if output_decl is None:
+            output_decl = table_summary_output(version.definition_json)
         if output_decl is None:
             continue
 

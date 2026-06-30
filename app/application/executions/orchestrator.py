@@ -27,6 +27,7 @@ from app.domain.exceptions import (
     VersionConflictError,
 )
 from app.domain.executors.registry import NodeExecutorRegistry
+from app.domain.executors.table import TableExecutor
 from app.domain.graph.workflow_graph import WorkflowGraph
 from app.domain.ports.executors import ExecutionContext
 from app.domain.state.workflow import WorkflowStateMachine
@@ -334,14 +335,31 @@ class WorkflowOrchestrator:
                 if graph_node.node_definition_id
                 else None
             )
-            pending_forms[node_instance.workflow_node_id] = {
-                "task_name": resolve_task_name(
-                    graph_node=graph_node,
-                    definition_json=definition_json,
-                    definition_name=node_definition.name if node_definition else None,
-                ),
-                "fields": executor.prepare_form_fields(context),
-            }
+            task_name = resolve_task_name(
+                graph_node=graph_node,
+                definition_json=definition_json,
+                definition_name=node_definition.name if node_definition else None,
+            )
+            form_payload: dict[str, Any] = {"task_name": task_name}
+            if isinstance(executor, TableExecutor):
+                initial_rows: list[dict[str, Any]] | None = None
+                latest_execution = self._instances.get_latest_node_execution(node_instance.id)
+                if latest_execution is not None:
+                    table_config = definition_json.get("table") or {}
+                    output_key = table_config.get("outputKey")
+                    if isinstance(output_key, str):
+                        rows = latest_execution.outputs_json.get(output_key)
+                        if isinstance(rows, list):
+                            initial_rows = [row for row in rows if isinstance(row, dict)]
+                form_payload.update(
+                    executor.prepare_pending_form(
+                        context,
+                        initial_rows=initial_rows,
+                    )
+                )
+            else:
+                form_payload["fields"] = executor.prepare_form_fields(context)
+            pending_forms[node_instance.workflow_node_id] = form_payload
 
         return pending_forms
 

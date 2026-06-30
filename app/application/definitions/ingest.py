@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.domain.definitions.output_fields import collect_output_field_ids, validate_declared_output
 from app.domain.exceptions import DuplicateSlugError, NotFoundError, ValidationError
 from app.domain.validation.form_blueprint import validate_form_blueprint
+from app.domain.validation.table_blueprint import validate_table_blueprint
 from app.domain.validation.pipeline import validate_workflow_definition
 from app.infrastructure.db.models import (
     NodeDefinition,
@@ -39,6 +40,17 @@ class DefinitionIngestService:
                 raise ValidationError(
                     "Node form blueprint validation failed",
                     details=[issue.to_dict() for issue in form_issues + output_issues],
+                )
+
+        if payload.baseKind == "table":
+            table_issues = validate_table_blueprint(
+                payload.table.model_dump() if payload.table is not None else None,
+                strict=payload.status == "published",
+            )
+            if table_issues:
+                raise ValidationError(
+                    "Node table blueprint validation failed",
+                    details=[issue.to_dict() for issue in table_issues],
                 )
 
         existing = self._repo.get_node_definition(payload.id)

@@ -217,3 +217,110 @@ class TestExecutionsAPI:
     def test_request_validation_error_shape(self, api_client: TestClient):
         response = api_client.post("/api/v1/instances", json={})
         _assert_error_shape(response, status_code=422, code="VALIDATION_ERROR")
+
+
+TABLE_WORKFLOW_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+TABLE_GRAPH_NODE = "d35097cf-f4e2-5064-9ccf-7c707c9fee79"
+
+
+def _seed_table_workflow(api_client: TestClient) -> None:
+    api_client.post("/api/v1/definitions/nodes", json=_load("node_general_information.json"))
+    api_client.post("/api/v1/definitions/nodes", json=_load("node_add_child_parts.json"))
+    api_client.post("/api/v1/definitions/workflows", json=_load("workflow_with_table.json"))
+
+
+@pytest.mark.integration
+class TestTableExecutionsAPI:
+    def test_table_task_pending_form_and_submit(self, api_client: TestClient):
+        _seed_table_workflow(api_client)
+
+        start_response = api_client.post(
+            "/api/v1/instances",
+            json={"name": "Table Run", "workflow_definition_id": TABLE_WORKFLOW_ID},
+        )
+        assert start_response.status_code == 201
+        instance_id = start_response.json()["id"]
+
+        submit_general = api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{GENERAL_INFO_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "castingProcess": "GDC",
+                    "volume": 10,
+                }
+            },
+        )
+        assert submit_general.status_code == 200
+        body = submit_general.json()
+        assert body["pending_node_ids"] == [TABLE_GRAPH_NODE]
+
+        table_form = body["pending_node_forms"][TABLE_GRAPH_NODE]
+        assert table_form["task_name"] == "Add Child Parts"
+        assert table_form["outputKey"] == "childParts"
+        assert table_form["minRows"] == 1
+        assert table_form["initialRows"] == []
+        assert table_form["summary"]["outputKey"] == "childPartsTotal"
+        assert "fields" not in table_form or table_form.get("fields") == []
+        assert {column["id"] for column in table_form["columns"]} == {
+            "partNo",
+            "qty",
+            "lineCost",
+        }
+        part_no_column = next(
+            column for column in table_form["columns"] if column["id"] == "partNo"
+        )
+        assert part_no_column["defaultValue"] == "PART-1"
+
+        submit_table = api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{TABLE_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "childParts": [
+                        {"partNo": "A", "qty": 2, "lineCost": 20},
+                        {"partNo": "B", "qty": 1, "lineCost": 50},
+                    ],
+                    "childPartsTotal": 70,
+                }
+            },
+        )
+        assert submit_table.status_code == 200
+        completed = submit_table.json()
+        assert completed["status"] == "COMPLETED"
+        node_outputs = completed["workflow_projection"]["nodes"][TABLE_GRAPH_NODE]["outputs"]
+        assert node_outputs["childPartsTotal"] == 70
+        assert len(node_outputs["childParts"]) == 2
+        assert completed["workflow_projection"]["total"] == 70.0
+        assert completed["execution_summary"]["items"][-1]["output_key"] == "childPartsTotal"
+        assert completed["execution_summary"]["items"][-1]["value"] == 70
+
+    def test_table_submit_rejects_summary_mismatch(self, api_client: TestClient):
+        _seed_table_workflow(api_client)
+        start_response = api_client.post(
+            "/api/v1/instances",
+            json={"name": "Table Run Bad Sum", "workflow_definition_id": TABLE_WORKFLOW_ID},
+        )
+        instance_id = start_response.json()["id"]
+        api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{GENERAL_INFO_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "castingProcess": "GDC",
+                    "volume": 10,
+                }
+            },
+        )
+
+        response = api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{TABLE_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "childParts": [{"partNo": "A", "qty": 2, "lineCost": 20}],
+                    "childPartsTotal": 99,
+                }
+            },
+        )
+        _assert_error_shape(response, status_code=400, code="FIELD_VALIDATION_FAILED")

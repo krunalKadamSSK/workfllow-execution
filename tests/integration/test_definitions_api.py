@@ -19,7 +19,7 @@ class TestDefinitionsAPI:
         response = api_client.get("/api/v1/definitions/base-types")
         assert response.status_code == 200
         kinds = {item["kind"] for item in response.json()}
-        assert kinds == {"userInput", "ai", "script"}
+        assert kinds == {"userInput", "ai", "script", "table"}
         user_input = next(item for item in response.json() if item["kind"] == "userInput")
         assert user_input["displayName"] == "User task"
         assert user_input["enabled"] is True
@@ -37,6 +37,32 @@ class TestDefinitionsAPI:
         get_response = api_client.get("/api/v1/definitions/nodes/general-information")
         assert get_response.status_code == 200
         assert get_response.json()["id"] == payload["id"]
+
+    def test_publish_table_node_definition(self, api_client: TestClient):
+        payload = _load("node_add_child_parts.json")
+        response = api_client.post("/api/v1/definitions/nodes", json=payload)
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["slug"] == "add-child-parts"
+        assert body["version"]["definition_json"]["baseKind"] == "table"
+        assert body["version"]["definition_json"]["table"]["outputKey"] == "childParts"
+
+    def test_publish_table_draft_with_empty_columns(self, api_client: TestClient):
+        payload = {
+            "id": "4be27d77-5528-4228-8418-c0cf703ec92a",
+            "name": "table task",
+            "slug": "table-task-draft",
+            "status": "draft",
+            "version": "1.0.0",
+            "baseKind": "table",
+            "appearance": _load("node_add_child_parts.json")["appearance"],
+            "table": {"columns": [], "outputKey": "rows", "minRows": 1},
+        }
+        response = api_client.post("/api/v1/definitions/nodes", json=payload)
+        assert response.status_code == 201
+        assert response.json()["status"] == "draft"
+        assert response.json()["version"]["definition_json"]["table"]["columns"] == []
 
     def test_publish_workflow_with_node_references(self, api_client: TestClient):
         api_client.post("/api/v1/definitions/nodes", json=_load("node_general_information.json"))

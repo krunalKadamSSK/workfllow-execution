@@ -1,0 +1,48 @@
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "appearance": {
+    "icon": { "kind": "lucide", "name": "Table" },
+    "color": { "kind": "token", "value": "primary" },
+    "shape": "card",
+    "badge": "TABLE"
+  },
+  "baseKind": "table",
+  "description": null,
+  "table": {
+    "columns": [
+      {
+        "id": "partNo",
+        "type": "text",
+        "label": "Part number",
+        "validation": [{ "rule": "required", "message": "Part number is required" }]
+      },
+      {
+        "id": "qty",
+        "type": "number",
+        "label": "Qty",
+        "validation": [
+          { "rule": "required", "message": "Qty is required" },
+          { "rule": "min", "value": 1, "message": "Min quantity is 1" }
+        ]
+      },
+      {
+        "id": "lineCost",
+        "type": "number",
+        "label": "Line cost",
+        "readOnly": true
+      }
+    ],
+    "outputKey": "childParts",
+    "summary": {
+      "columnId": "lineCost",
+      "outputKey": "childPartsTotal",
+      "label": "Child parts total"
+    },
+    "minRows": 1,
+    "crossFieldConstraints": []
+  },
+  "name": "Add Child Parts",
+  "slug": "add-child-parts",
+  "status": "published",
+  "version": "1.0.0"
+}

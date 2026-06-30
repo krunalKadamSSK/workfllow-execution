@@ -29,8 +29,15 @@ class WorkflowNodeInstanceResponse(BaseModel):
 
 
 class PendingNodeFormResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     task_name: str | None = None
     fields: list[dict[str, Any]] = Field(default_factory=list)
+    columns: list[dict[str, Any]] | None = None
+    outputKey: str | None = None
+    summary: dict[str, Any] | None = None
+    minRows: int | None = None
+    initialRows: list[dict[str, Any]] | None = None
 
 
 class ExecutionSummaryItem(BaseModel):

@@ -174,6 +174,16 @@ class InstanceRepository(BaseRepository):
             raise NotFoundError(f"Workflow instance not found: {instance_id}")
         return instance
 
+    def get_latest_node_execution(
+        self, node_instance_id: str
+    ) -> WorkflowNodeExecution | None:
+        return self.session.scalar(
+            select(WorkflowNodeExecution)
+            .where(WorkflowNodeExecution.workflow_node_instance_id == node_instance_id)
+            .order_by(WorkflowNodeExecution.execution_number.desc())
+            .limit(1)
+        )
+
     def list_node_executions(self, workflow_instance_id: str) -> list[WorkflowNodeExecution]:
         return list(
             self.session.scalars(
