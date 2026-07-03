@@ -19,7 +19,7 @@ class TestDefinitionsAPI:
         response = api_client.get("/api/v1/definitions/base-types")
         assert response.status_code == 200
         kinds = {item["kind"] for item in response.json()}
-        assert kinds == {"userInput", "ai", "script"}
+        assert kinds == {"userInput", "table"}
         user_input = next(item for item in response.json() if item["kind"] == "userInput")
         assert user_input["displayName"] == "User task"
         assert user_input["enabled"] is True

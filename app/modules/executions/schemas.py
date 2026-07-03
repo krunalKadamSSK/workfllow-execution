@@ -29,8 +29,15 @@ class WorkflowNodeInstanceResponse(BaseModel):
 
 
 class PendingNodeFormResponse(BaseModel):
+    """Pending user task form — synapse fields or table row configuration."""
+
+    model_config = ConfigDict(extra="allow")
+
     task_name: str | None = None
+    formKind: str | None = None
     fields: list[dict[str, Any]] = Field(default_factory=list)
+    table: dict[str, Any] | None = None
+    aggregations: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ExecutionSummaryItem(BaseModel):

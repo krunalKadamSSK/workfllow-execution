@@ -340,7 +340,7 @@ class WorkflowOrchestrator:
                     definition_json=definition_json,
                     definition_name=node_definition.name if node_definition else None,
                 ),
-                "fields": executor.prepare_form_fields(context),
+                **executor.prepare_pending_node_form(context),
             }
 
         return pending_forms

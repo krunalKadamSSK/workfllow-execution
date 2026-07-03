@@ -1,6 +1,10 @@
 from sqlalchemy.orm import Session
 
-from app.domain.definitions.output_fields import collect_output_field_ids, validate_declared_output
+from app.domain.definitions.output_fields import (
+    collect_input_field_ids,
+    collect_output_field_ids,
+    validate_declared_output,
+)
 from app.domain.exceptions import DuplicateSlugError, NotFoundError, ValidationError
 from app.domain.validation.form_blueprint import validate_form_blueprint
 from app.domain.validation.pipeline import validate_workflow_definition
@@ -41,6 +45,14 @@ class DefinitionIngestService:
                     details=[issue.to_dict() for issue in form_issues + output_issues],
                 )
 
+        if payload.baseKind == "table":
+            output_issues = validate_declared_output(payload.to_stored_json())
+            if output_issues:
+                raise ValidationError(
+                    "Table node definition validation failed",
+                    details=[issue.to_dict() for issue in output_issues],
+                )
+
         existing = self._repo.get_node_definition(payload.id)
         if existing is not None:
             return self._publish_existing_node(existing, payload, created_by=created_by)
@@ -70,6 +82,7 @@ class DefinitionIngestService:
             payload,
             published_node_ids=published_node_ids,
             node_output_fields=node_output_fields,
+            node_input_fields=self._resolve_task_node_input_fields(payload),
         )
         if issues:
             raise ValidationError(
@@ -200,3 +213,24 @@ class DefinitionIngestService:
             node_output_fields[definition.id] = collect_output_field_ids(version.definition_json)
 
         return published_node_ids, node_output_fields
+
+    def _resolve_task_node_input_fields(
+        self, payload: WorkflowDefinitionIngest
+    ) -> dict[str, set[str]]:
+        node_input_fields: dict[str, set[str]] = {}
+
+        for node in payload.task_nodes():
+            assert node.nodeDefinitionId is not None
+            definition = self._repo.get_node_definition(node.nodeDefinitionId)
+            if definition is None or definition.status != "published":
+                continue
+
+            version = self._repo.get_node_definition_version(
+                definition.id, definition.latest_version
+            )
+            if version is None:
+                continue
+
+            node_input_fields[definition.id] = collect_input_field_ids(version.definition_json)
+
+        return node_input_fields
