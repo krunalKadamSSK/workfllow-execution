@@ -13,6 +13,48 @@ def test_compute_table_aggregation_sum():
     assert compute_table_aggregation(rows, "lineTotal", "sum") == 90.0
 
 
+def test_compute_table_aggregation_sum_string_values():
+    rows = [{"lineTotal": "50"}, {"lineTotal": "40"}]
+    assert compute_table_aggregation(rows, "lineTotal", "sum") == 90.0
+
+
+def test_table_executor_ignores_client_submitted_aggregation_values():
+    executor = TableExecutor()
+    context = ExecutionContext(
+        workflow_instance_id="inst-1",
+        workflow_node_instance_id="node-inst-1",
+        workflow_node_id="node-1",
+        node_definition_version_id="ver-1",
+        base_kind="table",
+        definition_json={
+            "baseKind": "table",
+            "table": {
+                "columns": [
+                    {"id": "lineTotal", "type": "number", "label": "Line total"},
+                ],
+            },
+            "aggregations": [
+                {
+                    "id": "totalChildCost",
+                    "label": "Total",
+                    "columnId": "lineTotal",
+                    "operation": "sum",
+                }
+            ],
+        },
+    )
+
+    outputs = executor.run(
+        context,
+        {
+            "rows": [{"lineTotal": 200}],
+            "totalChildCost": 20,
+        },
+    )
+
+    assert outputs["totalChildCost"] == 200.0
+
+
 def test_table_executor_complete_builds_aggregation_outputs():
     executor = TableExecutor()
     context = ExecutionContext(

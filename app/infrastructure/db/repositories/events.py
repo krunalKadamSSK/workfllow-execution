@@ -1,3 +1,4 @@
+from app.infrastructure.db.models.events import WorkflowEvent
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -67,10 +68,10 @@ class EventRepository(BaseRepository):
         if after_sequence is not None:
             query = query.where(WorkflowEvent.sequence_number > after_sequence)
         query = query.order_by(WorkflowEvent.sequence_number.asc())
-        return list(self.session.scalars(query))
+        return list[WorkflowEvent](self.session.scalars(query))
 
     def list_all_events(self) -> list[WorkflowEvent]:
-        return list(
+        return list[WorkflowEvent](
             self.session.scalars(
                 select(WorkflowEvent).order_by(
                     WorkflowEvent.workflow_instance_id,

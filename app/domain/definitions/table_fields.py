@@ -17,13 +17,28 @@ def parse_table_column_input_key(input_key: str) -> str | None:
     return column_id or None
 
 
+def _parse_numeric(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return None
+    return None
+
+
 def _numeric_values(rows: list[dict[str, Any]], column_id: str) -> list[float]:
     values: list[float] = []
     for row in rows:
-        value = row.get(column_id)
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            continue
-        values.append(float(value))
+        parsed = _parse_numeric(row.get(column_id))
+        if parsed is not None:
+            values.append(parsed)
     return values
 
 

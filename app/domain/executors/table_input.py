@@ -177,6 +177,7 @@ class TableExecutor(BaseNodeExecutor):
         rows = clean_outputs.get(TABLE_ROWS_INPUT_KEY)
         row_list = [dict(row) for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
 
+        # Aggregations are always derived server-side from row column values.
         return build_table_task_outputs(header, row_list, aggregations)
 
     @staticmethod
