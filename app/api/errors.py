@@ -123,9 +123,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(VersionConflictError)
-    async def version_conflict_handler(
-        request: Request, exc: VersionConflictError
-    ) -> JSONResponse:
+    async def version_conflict_handler(request: Request, exc: VersionConflictError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content=_error_body(

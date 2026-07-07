@@ -1,9 +1,8 @@
-from app.infrastructure.db.models.events import WorkflowEvent
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.domain.exceptions import NotFoundError, SequenceConflictError
-from app.infrastructure.db.models import WorkflowEvent
+from app.infrastructure.db.models.events import WorkflowEvent
 from app.infrastructure.db.repositories.base import BaseRepository
 
 

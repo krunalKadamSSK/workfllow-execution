@@ -120,12 +120,16 @@ class FormFieldValidator:
         for constraint in constraints:
             logic = str(constraint.get("logic", "")).strip()
             target = str(constraint.get("target", ""))
-            message = str(constraint.get("message") or f"Cross-field validation failed for {target}")
+            message = str(
+                constraint.get("message") or f"Cross-field validation failed for {target}"
+            )
 
             match = CROSS_FIELD_LOGIC_PATTERN.match(logic)
             if match is None:
                 errors.append(
-                    _field_error(target or "form", "crossField", f"Invalid constraint logic: {logic}")
+                    _field_error(
+                        target or "form", "crossField", f"Invalid constraint logic: {logic}"
+                    )
                 )
                 continue
 

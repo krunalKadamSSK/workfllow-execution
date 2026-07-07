@@ -9,12 +9,18 @@ def test_resolve_task_name_prefers_graph_label():
         node_definition_id="def-1",
         label="Custom label",
     )
-    assert resolve_task_name(graph_node=node, definition_json={"name": "Definition name"}) == "Custom label"
+    assert (
+        resolve_task_name(graph_node=node, definition_json={"name": "Definition name"})
+        == "Custom label"
+    )
 
 
 def test_resolve_task_name_falls_back_to_definition_name():
     node = GraphNode(id="node-1", kind="task", node_definition_id="def-1")
-    assert resolve_task_name(graph_node=node, definition_json={"name": "Raw Material Pricing"}) == "Raw Material Pricing"
+    assert (
+        resolve_task_name(graph_node=node, definition_json={"name": "Raw Material Pricing"})
+        == "Raw Material Pricing"
+    )
 
 
 def test_resolve_task_name_falls_back_to_graph_node_id():

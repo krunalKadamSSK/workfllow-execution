@@ -1,5 +1,3 @@
-import pytest
-
 from app.domain.definitions.table_fields import (
     build_table_task_outputs,
     compute_table_aggregation,

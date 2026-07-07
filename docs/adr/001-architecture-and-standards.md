@@ -1,7 +1,7 @@
 # ADR-001: Architecture and Coding Standards
 
-**Status:** Accepted  
-**Date:** 2026-06-18  
+**Status:** Accepted
+**Date:** 2026-06-18
 **Phase:** 0 — Foundation
 
 ## Context

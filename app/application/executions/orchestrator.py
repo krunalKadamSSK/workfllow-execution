@@ -277,16 +277,12 @@ class WorkflowOrchestrator:
         return scheduler.resolve_next_task_id(statuses, from_node_id=anchor)
 
     @staticmethod
-    def _anchor_node_id(
-        graph: WorkflowGraph, node_instances: list[WorkflowNodeInstance]
-    ) -> str:
+    def _anchor_node_id(graph: WorkflowGraph, node_instances: list[WorkflowNodeInstance]) -> str:
         completed = [node for node in node_instances if node.status == NodeStatus.COMPLETED]
         if not completed:
             return graph.start_node.id
 
-        topo_index = {
-            node_id: index for index, node_id in enumerate(graph.topological_order())
-        }
+        topo_index = {node_id: index for index, node_id in enumerate(graph.topological_order())}
         latest = max(
             completed,
             key=lambda node: topo_index.get(node.workflow_node_id, -1),
@@ -376,12 +372,9 @@ class WorkflowOrchestrator:
 
         scheduler = GraphScheduler(graph)
         node_instances = {
-            node.workflow_node_id: node
-            for node in self._instances.list_node_instances(instance.id)
+            node.workflow_node_id: node for node in self._instances.list_node_instances(instance.id)
         }
-        statuses = {
-            node_id: node.status for node_id, node in node_instances.items()
-        }
+        statuses = {node_id: node.status for node_id, node in node_instances.items()}
 
         for graph_node in scheduler.ready_task_nodes(statuses):
             node_instance = node_instances[graph_node.id]
@@ -502,9 +495,7 @@ class WorkflowOrchestrator:
         instances = self._instances.list_workflow_instances()
         executions_by_instance: dict[str, list] = {}
         for execution in self._instances.list_all_node_executions():
-            executions_by_instance.setdefault(execution.workflow_instance_id, []).append(
-                execution
-            )
+            executions_by_instance.setdefault(execution.workflow_instance_id, []).append(execution)
 
         events_by_instance: dict[str, list] = {}
         for event in self._events.list_all_workflow_events():

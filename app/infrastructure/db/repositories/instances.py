@@ -97,9 +97,7 @@ class InstanceRepository(BaseRepository):
     def require_node_instance_by_graph_id(
         self, workflow_instance_id: str, workflow_node_id: str
     ) -> WorkflowNodeInstance:
-        node_instance = self.get_node_instance_by_graph_id(
-            workflow_instance_id, workflow_node_id
-        )
+        node_instance = self.get_node_instance_by_graph_id(workflow_instance_id, workflow_node_id)
         if node_instance is None:
             raise NotFoundError(
                 f"Workflow node instance not found: {workflow_node_id} "

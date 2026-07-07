@@ -47,7 +47,7 @@ def _user_input_cost_contribution(
         return None
 
     value = outputs.get(output_decl["id"])
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value)
 
@@ -112,11 +112,7 @@ def validate_declared_output(definition_json: dict[str, Any]) -> list[Validation
     if definition_json.get("baseKind") == "table":
         aggregations = definition_json.get("aggregations") or []
         aggregation = next(
-            (
-                row
-                for row in aggregations
-                if isinstance(row, dict) and row.get("id") == output_id
-            ),
+            (row for row in aggregations if isinstance(row, dict) and row.get("id") == output_id),
             None,
         )
         if aggregation is None:

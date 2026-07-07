@@ -26,7 +26,9 @@ def _load(name: str) -> dict:
 def seeded_definitions(db_session):
     ingest = DefinitionIngestService(db_session)
     ingest.publish_node(NodeDefinitionIngest.model_validate(_load("node_general_information.json")))
-    ingest.publish_node(NodeDefinitionIngest.model_validate(_load("node_raw_material_pricing.json")))
+    ingest.publish_node(
+        NodeDefinitionIngest.model_validate(_load("node_raw_material_pricing.json"))
+    )
     ingest.publish_workflow(WorkflowDefinitionIngest.model_validate(_load("workflow_test.json")))
     db_session.flush()
     return ingest

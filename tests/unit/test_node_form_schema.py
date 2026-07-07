@@ -29,9 +29,7 @@ GENERAL_INFORMATION_FORM = {
                 "labelKey": "name",
                 "valueKey": "name",
             },
-            "validation": [
-                {"rule": "required", "message": "Customer Name is Required"}
-            ],
+            "validation": [{"rule": "required", "message": "Customer Name is Required"}],
         },
         {
             "id": "cad_part",
@@ -42,9 +40,7 @@ GENERAL_INFORMATION_FORM = {
                 "labelKey": "part_name",
                 "valueKey": "id",
             },
-            "validation": [
-                {"rule": "required", "message": "Cad Part name is required"}
-            ],
+            "validation": [{"rule": "required", "message": "Cad Part name is required"}],
         },
         {
             "id": "casting_process",
@@ -54,9 +50,7 @@ GENERAL_INFORMATION_FORM = {
                 {"label": "Gravity Die Casting", "value": "GCD"},
                 {"label": "Presure Die Casting", "value": "PCD"},
             ],
-            "validation": [
-                {"rule": "required", "message": "Casting Process is required.."}
-            ],
+            "validation": [{"rule": "required", "message": "Casting Process is required.."}],
         },
         {
             "id": "reason_selecting_casting_process",

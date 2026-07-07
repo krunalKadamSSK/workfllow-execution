@@ -1,5 +1,3 @@
-import pytest
-
 from app.domain.validation.form_blueprint import validate_form_blueprint
 
 
@@ -76,9 +74,7 @@ def test_dangling_remote_requires_fails():
 def test_invalid_cross_field_logic_fails():
     form = {
         "fields": [_minimal_field()],
-        "crossFieldConstraints": [
-            {"logic": "not valid", "target": "qty", "message": "bad logic"}
-        ],
+        "crossFieldConstraints": [{"logic": "not valid", "target": "qty", "message": "bad logic"}],
     }
     issues = validate_form_blueprint(form)
     assert any(issue.code == "INVALID_CROSS_FIELD_LOGIC" for issue in issues)

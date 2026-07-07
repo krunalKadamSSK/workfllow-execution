@@ -116,7 +116,7 @@ def _recompute_total(state: dict[str, Any]) -> None:
         contribution = node.get("cost_contribution")
         if isinstance(contribution, bool):
             continue
-        if isinstance(contribution, (int, float)):
+        if isinstance(contribution, int | float):
             total += float(contribution)
             found = True
     state["total"] = total if found else None

@@ -30,9 +30,7 @@ class UserInputExecutor(BaseNodeExecutor):
         )
         self._validate_declared_output(context, clean_outputs)
 
-    def _validate_declared_output(
-        self, context: ExecutionContext, outputs: dict[str, Any]
-    ) -> None:
+    def _validate_declared_output(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
         output_decl = declared_output(context.definition_json)
         if output_decl is None:
             return
@@ -50,7 +48,7 @@ class UserInputExecutor(BaseNodeExecutor):
                     }
                 ],
             )
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
+        if isinstance(value, bool) or not isinstance(value, int | float):
             raise FieldValidationError(
                 f"Declared output '{output_id}' must be a number",
                 field_errors=[
@@ -61,6 +59,6 @@ class UserInputExecutor(BaseNodeExecutor):
                     }
                 ],
             )
+
     def complete(self, context: ExecutionContext, outputs: dict[str, Any]) -> dict[str, Any]:
         return self._strip_internal_keys(outputs)
-

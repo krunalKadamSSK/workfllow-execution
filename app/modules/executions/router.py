@@ -28,12 +28,12 @@ def get_execution_service(session: Session = Depends(get_session)) -> ExecutionS
 def _current_total_cost(state: dict) -> float | None:
     projection = state.get("workflow_projection") or {}
     total = projection.get("total")
-    if isinstance(total, (int, float)) and not isinstance(total, bool):
+    if isinstance(total, int | float) and not isinstance(total, bool):
         return float(total)
 
     summary = state.get("execution_summary") or {}
     summary_total = summary.get("total")
-    if isinstance(summary_total, (int, float)) and not isinstance(summary_total, bool):
+    if isinstance(summary_total, int | float) and not isinstance(summary_total, bool):
         return float(summary_total)
 
     return None

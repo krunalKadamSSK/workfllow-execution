@@ -14,7 +14,6 @@ from openpyxl.worksheet.worksheet import Worksheet
 from app.infrastructure.db.models.events import WorkflowEvent
 from app.infrastructure.db.models.instances import WorkflowInstance, WorkflowNodeExecution
 
-
 ALL_EXPORT_FILENAME = "workflow-executions-export.xlsx"
 
 
@@ -26,7 +25,7 @@ def safe_export_filename(instance_name: str) -> str:
 def _cell_value(value: Any) -> Any:
     if value is None:
         return ""
-    if isinstance(value, (str, int, float, bool)):
+    if isinstance(value, str | int | float | bool):
         return value
     if isinstance(value, datetime):
         return value.isoformat()
@@ -140,9 +139,7 @@ def _build_output_rows(
     include_in_all_export: bool,
 ) -> list[list[Any]]:
     task_names: dict[str, str] = context.state.get("task_names") or {}
-    node_instance_by_id = {
-        node.id: node for node in (context.state.get("node_instances") or [])
-    }
+    node_instance_by_id = {node.id: node for node in (context.state.get("node_instances") or [])}
     rows: list[list[Any]] = []
     for execution in context.executions:
         node_instance = node_instance_by_id.get(execution.workflow_node_instance_id)
@@ -323,7 +320,10 @@ def build_instance_excel_export(
     summary_rows = [
         ["Instance ID", context.instance.id],
         ["Instance Name", context.instance.name],
-        ["Workflow Definition", context.workflow_definition_name or context.instance.workflow_definition_id],
+        [
+            "Workflow Definition",
+            context.workflow_definition_name or context.instance.workflow_definition_id,
+        ],
         ["Status", context.instance.status.value],
         ["Created At", context.instance.created_at],
         ["Completed At", context.instance.completed_at or ""],

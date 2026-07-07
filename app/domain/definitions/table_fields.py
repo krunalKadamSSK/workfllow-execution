@@ -20,7 +20,7 @@ def parse_table_column_input_key(input_key: str) -> str | None:
 def _parse_numeric(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     if isinstance(value, str):
         stripped = value.strip()
@@ -141,12 +141,14 @@ def declared_table_output(definition_json: dict[str, Any]) -> dict[str, str] | N
     }
 
 
-def table_cost_contribution(definition_json: dict[str, Any], outputs: dict[str, Any]) -> float | None:
+def table_cost_contribution(
+    definition_json: dict[str, Any], outputs: dict[str, Any]
+) -> float | None:
     output_decl = declared_table_output(definition_json)
     if output_decl is None:
         return None
 
     value = outputs.get(output_decl["id"])
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value)

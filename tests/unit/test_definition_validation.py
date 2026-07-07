@@ -159,7 +159,9 @@ def test_table_column_input_key_is_valid_input():
             "aggregations": [],
         }
     )
-    user_input_node = NodeDefinitionIngest.model_validate(load_json("node_general_information.json"))
+    user_input_node = NodeDefinitionIngest.model_validate(
+        load_json("node_general_information.json")
+    )
 
     workflow = WorkflowDefinitionIngest.model_validate(
         {

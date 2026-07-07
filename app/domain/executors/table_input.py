@@ -3,11 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from app.domain.definitions.table_fields import (
-    TABLE_COLUMN_INPUT_PREFIX,
     TABLE_ROWS_INPUT_KEY,
     build_table_task_outputs,
     parse_table_column_input_key,
-    table_column_input_key,
 )
 from app.domain.exceptions import FieldValidationError
 from app.domain.executors.base import BaseNodeExecutor
@@ -49,9 +47,7 @@ class TableExecutor(BaseNodeExecutor):
         default_rows = int(table.get("defaultRows") or 1)
         if not initial_rows:
             count = max(default_rows, min_rows)
-            initial_rows = [
-                self._create_empty_row(columns, column_defaults) for _ in range(count)
-            ]
+            initial_rows = [self._create_empty_row(columns, column_defaults) for _ in range(count)]
         else:
             initial_rows = [
                 {
@@ -175,7 +171,9 @@ class TableExecutor(BaseNodeExecutor):
                     header[field_id] = clean_outputs[field_id]
 
         rows = clean_outputs.get(TABLE_ROWS_INPUT_KEY)
-        row_list = [dict(row) for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+        row_list = (
+            [dict(row) for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+        )
 
         # Aggregations are always derived server-side from row column values.
         return build_table_task_outputs(header, row_list, aggregations)
@@ -248,7 +246,9 @@ class TableExecutor(BaseNodeExecutor):
                         {
                             "field": f"{TABLE_ROWS_INPUT_KEY}[{index}].{column_id}",
                             "rule": "locked",
-                            "message": f"Locked column '{column_id}' was modified in row {index + 1}",
+                            "message": (
+                                f"Locked column '{column_id}' was modified in row {index + 1}"
+                            ),
                         }
                     )
 
