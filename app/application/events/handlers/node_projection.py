@@ -12,10 +12,19 @@ class WorkflowNodeProjectionHandler:
         self._projections = projection_repository
 
     def handles(self) -> frozenset[str]:
-        return frozenset({WorkflowEventType.NODE_COMPLETED.value})
+        return frozenset(
+            {
+                WorkflowEventType.NODE_COMPLETED.value,
+                WorkflowEventType.NODE_INVALIDATED.value,
+            }
+        )
 
     def handle(self, event: StoredEvent) -> None:
         payload = event.payload_json
+        if event.event_type == WorkflowEventType.NODE_INVALIDATED.value:
+            self._projections.clear_node_projection(payload["workflow_node_instance_id"])
+            return
+
         self._projections.upsert_node_projection(
             workflow_instance_id=event.workflow_instance_id,
             workflow_node_instance_id=payload["workflow_node_instance_id"],

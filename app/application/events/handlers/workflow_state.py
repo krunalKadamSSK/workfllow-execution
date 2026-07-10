@@ -94,11 +94,10 @@ def apply_workflow_projection_event(state: dict[str, Any], event: StoredEvent) -
         return next_state
 
     if event.event_type == WorkflowEventType.NODE_INVALIDATED.value:
-        _upsert_node_state(
+        _invalidate_node_state(
             next_state,
             workflow_node_id=payload["workflow_node_id"],
             workflow_node_instance_id=payload["workflow_node_instance_id"],
-            status="INVALIDATED",
             reason=payload.get("reason"),
         )
         _recompute_total(next_state)
@@ -120,6 +119,25 @@ def _recompute_total(state: dict[str, Any]) -> None:
             total += float(contribution)
             found = True
     state["total"] = total if found else None
+
+
+def _invalidate_node_state(
+    state: dict[str, Any],
+    *,
+    workflow_node_id: str,
+    workflow_node_instance_id: str,
+    reason: str | None,
+) -> None:
+    nodes = state.setdefault("nodes", {})
+    node_state = dict(nodes.get(workflow_node_id, {}))
+    node_state["workflow_node_id"] = workflow_node_id
+    node_state["workflow_node_instance_id"] = workflow_node_instance_id
+    node_state["status"] = "INVALIDATED"
+    if reason is not None:
+        node_state["reason"] = reason
+    node_state.pop("outputs", None)
+    node_state.pop("cost_contribution", None)
+    nodes[workflow_node_id] = node_state
 
 
 def _upsert_node_state(state: dict[str, Any], *, workflow_node_id: str, **updates: Any) -> None:

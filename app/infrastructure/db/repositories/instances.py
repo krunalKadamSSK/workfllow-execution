@@ -159,6 +159,21 @@ class InstanceRepository(BaseRepository):
         self.session.flush()
         return instance
 
+    def increment_revision(
+        self,
+        instance: WorkflowInstance,
+        *,
+        expected_revision: int | None = None,
+    ) -> WorkflowInstance:
+        if expected_revision is not None and instance.current_revision != expected_revision:
+            raise VersionConflictError(
+                f"Workflow instance revision conflict: expected {expected_revision}, "
+                f"got {instance.current_revision}"
+            )
+        instance.current_revision += 1
+        self.session.flush()
+        return instance
+
     def get_snapshot(self, workflow_instance_id: str) -> WorkflowSnapshot | None:
         return self.session.scalar(
             select(WorkflowSnapshot).where(

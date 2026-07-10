@@ -77,6 +77,16 @@ class ProjectionRepository(BaseRepository):
             )
         )
 
+    def clear_node_projection(self, workflow_node_instance_id: str) -> None:
+        existing = self.session.scalar(
+            select(WorkflowNodeProjection).where(
+                WorkflowNodeProjection.workflow_node_instance_id == workflow_node_instance_id
+            )
+        )
+        if existing is not None:
+            existing.current_values_json = {}
+            self.session.flush()
+
     def upsert_node_projection(
         self,
         *,

@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.domain.enums import NodeStatus
+
 
 class DbNodeProjectionReader:
     """Adapter: SQLAlchemy projection repository -> NodeProjectionReader port."""
 
-    def __init__(self, projection_repository) -> None:
+    def __init__(self, projection_repository, instance_repository=None) -> None:
         self._repository = projection_repository
+        self._instances = instance_repository
 
     def get_node_values(
         self,
@@ -15,7 +18,18 @@ class DbNodeProjectionReader:
         workflow_instance_id: str,
         workflow_node_id: str,
     ) -> dict[str, Any] | None:
-        return self._repository.get_node_values_by_graph_id(
+        if self._instances is not None:
+            node_instance = self._instances.get_node_instance_by_graph_id(
+                workflow_instance_id,
+                workflow_node_id,
+            )
+            if node_instance is None or node_instance.status != NodeStatus.COMPLETED:
+                return None
+
+        values = self._repository.get_node_values_by_graph_id(
             workflow_instance_id=workflow_instance_id,
             workflow_node_id=workflow_node_id,
         )
+        if values is None or len(values) == 0:
+            return None
+        return values

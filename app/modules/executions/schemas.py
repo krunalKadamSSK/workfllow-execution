@@ -17,6 +17,16 @@ class SubmitNodeOutputsRequest(BaseModel):
     expected_revision: int | None = None
 
 
+class InvalidateDownstreamRequest(BaseModel):
+    reason: str = "correction"
+    expected_revision: int | None = None
+    reopen_target: bool = True
+
+
+class WorkflowRevisionRequest(BaseModel):
+    expected_revision: int | None = None
+
+
 class WorkflowNodeInstanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -91,3 +101,19 @@ class WorkflowEventResponse(BaseModel):
     event_type: str
     payload_json: dict[str, Any]
     created_at: datetime
+
+
+class WorkflowNodeExecutionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workflow_node_id: str
+    workflow_node_instance_id: str
+    execution_number: int
+    inputs_json: dict[str, Any]
+    outputs_json: dict[str, Any]
+    status: str
+    executed_by: str | None = None
+    started_at: datetime
+    completed_at: datetime | None = None
+    task_name: str | None = None

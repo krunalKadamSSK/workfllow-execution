@@ -5,6 +5,8 @@ from app.domain.exceptions import NotFoundError, SequenceConflictError
 from app.infrastructure.db.models.events import WorkflowEvent
 from app.infrastructure.db.repositories.base import BaseRepository
 
+_SEQUENCE_APPEND_MAX_RETRIES = 3
+
 
 class EventRepository(BaseRepository):
     def get_next_sequence_number(self, workflow_instance_id: str) -> int:
@@ -26,29 +28,35 @@ class EventRepository(BaseRepository):
         current_hash: str | None = None,
         sequence_number: int | None = None,
     ) -> WorkflowEvent:
-        sequence = (
-            sequence_number
-            if sequence_number is not None
-            else self.get_next_sequence_number(workflow_instance_id)
-        )
-        event = WorkflowEvent(
-            workflow_instance_id=workflow_instance_id,
-            sequence_number=sequence,
-            event_type=event_type,
-            payload_json=payload_json,
-            created_by=created_by,
-            previous_hash=previous_hash,
-            current_hash=current_hash,
-        )
-        self.session.add(event)
-        try:
-            self.session.flush()
-        except IntegrityError as exc:
-            raise SequenceConflictError(
-                f"Event sequence conflict for workflow instance {workflow_instance_id} "
-                f"at sequence {sequence}"
-            ) from exc
-        return event
+        last_error: IntegrityError | None = None
+
+        for _ in range(_SEQUENCE_APPEND_MAX_RETRIES):
+            sequence = (
+                sequence_number
+                if sequence_number is not None
+                else self.get_next_sequence_number(workflow_instance_id)
+            )
+            event = WorkflowEvent(
+                workflow_instance_id=workflow_instance_id,
+                sequence_number=sequence,
+                event_type=event_type,
+                payload_json=payload_json,
+                created_by=created_by,
+                previous_hash=previous_hash,
+                current_hash=current_hash,
+            )
+            try:
+                with self.session.begin_nested():
+                    self.session.add(event)
+                    self.session.flush()
+                return event
+            except IntegrityError as exc:
+                last_error = exc
+                sequence_number = None
+
+        raise SequenceConflictError(
+            f"Event sequence conflict for workflow instance {workflow_instance_id}"
+        ) from last_error
 
     def get_latest_event(self, workflow_instance_id: str) -> WorkflowEvent | None:
         return self.session.scalar(
