@@ -32,6 +32,10 @@ class NodeExecutor(Protocol):
         """Return form fields with defaultValue when an upstream task supplies the value."""
         ...
 
+    def prepare_pending_node_form(self, context: ExecutionContext) -> dict[str, Any]:
+        """Return the pending-node form payload (formKind, fields, table config, etc.)."""
+        ...
+
     def validate_outputs(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
         """Validate submitted outputs."""
         ...

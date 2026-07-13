@@ -37,7 +37,7 @@ ignore = [
 "app/infrastructure/db/models/*.py" = ["F821", "UP042"]
 "app/domain/enums.py" = ["UP042"]
 "app/domain/events/types.py" = ["UP042"]
-"alembic/versions/*.py" = ["UP007", "UP035"]
+"alembic/versions/*.py" = ["E501", "UP007", "UP035", "W291"]
 "app/core/logging.py" = ["UP017"]
 "app/infrastructure/db/repositories/instances.py" = ["UP017"]
 

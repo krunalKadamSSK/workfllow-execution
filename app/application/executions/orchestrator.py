@@ -60,7 +60,9 @@ class WorkflowOrchestrator:
             instance_repository=instance_repository,
         )
         self._input_binder = GraphInputBinder(
-            UpstreamInputResolver(DbNodeProjectionReader(projection_repository))
+            UpstreamInputResolver(
+                DbNodeProjectionReader(projection_repository, instance_repository)
+            )
         )
 
     def start_workflow(
@@ -277,16 +279,12 @@ class WorkflowOrchestrator:
         return scheduler.resolve_next_task_id(statuses, from_node_id=anchor)
 
     @staticmethod
-    def _anchor_node_id(
-        graph: WorkflowGraph, node_instances: list[WorkflowNodeInstance]
-    ) -> str:
+    def _anchor_node_id(graph: WorkflowGraph, node_instances: list[WorkflowNodeInstance]) -> str:
         completed = [node for node in node_instances if node.status == NodeStatus.COMPLETED]
         if not completed:
             return graph.start_node.id
 
-        topo_index = {
-            node_id: index for index, node_id in enumerate(graph.topological_order())
-        }
+        topo_index = {node_id: index for index, node_id in enumerate(graph.topological_order())}
         latest = max(
             completed,
             key=lambda node: topo_index.get(node.workflow_node_id, -1),
@@ -340,7 +338,7 @@ class WorkflowOrchestrator:
                     definition_json=definition_json,
                     definition_name=node_definition.name if node_definition else None,
                 ),
-                "fields": executor.prepare_form_fields(context),
+                **executor.prepare_pending_node_form(context),
             }
 
         return pending_forms
@@ -376,12 +374,9 @@ class WorkflowOrchestrator:
 
         scheduler = GraphScheduler(graph)
         node_instances = {
-            node.workflow_node_id: node
-            for node in self._instances.list_node_instances(instance.id)
+            node.workflow_node_id: node for node in self._instances.list_node_instances(instance.id)
         }
-        statuses = {
-            node_id: node.status for node_id, node in node_instances.items()
-        }
+        statuses = {node_id: node.status for node_id, node in node_instances.items()}
 
         for graph_node in scheduler.ready_task_nodes(statuses):
             node_instance = node_instances[graph_node.id]
@@ -420,7 +415,91 @@ class WorkflowOrchestrator:
                 ).to_dict(),
             )
 
+    def reopen_from_task(
+        self,
+        *,
+        workflow_instance_id: str,
+        workflow_node_id: str,
+        reason: str,
+        expected_revision: int | None = None,
+        reopen_target: bool = True,
+    ) -> list[WorkflowNodeInstance]:
+        instance = self._instances.require_workflow_instance(workflow_instance_id)
+        if instance.status not in {WorkflowStatus.RUNNING, WorkflowStatus.COMPLETED}:
+            raise InvalidTransitionError(
+                f"Cannot reopen task while workflow is {instance.status.value}"
+            )
+        if expected_revision is not None and instance.current_revision != expected_revision:
+            raise VersionConflictError(
+                f"Workflow instance revision conflict: expected {expected_revision}, "
+                f"got {instance.current_revision}"
+            )
+
+        graph = self._load_graph(instance)
+        graph_node = graph.require_node(workflow_node_id)
+        if not graph_node.is_task:
+            raise NodeExecutionError(f"Node '{workflow_node_id}' is not a task node")
+
+        affected: list[WorkflowNodeInstance] = []
+
+        if reopen_target:
+            target = self._instances.require_node_instance_by_graph_id(
+                workflow_instance_id, workflow_node_id
+            )
+            if target.status == NodeStatus.COMPLETED:
+                self._instances.update_node_status(target, NodeStatus.PENDING)
+                self._events.append(
+                    workflow_instance_id=workflow_instance_id,
+                    event_type=WorkflowEventType.NODE_INVALIDATED.value,
+                    payload_json=NodeInvalidatedPayload(
+                        workflow_instance_id=workflow_instance_id,
+                        workflow_node_instance_id=target.id,
+                        workflow_node_id=workflow_node_id,
+                        reason=reason,
+                    ).to_dict(),
+                )
+                affected.append(target)
+            elif target.status not in {NodeStatus.PENDING, NodeStatus.INVALIDATED}:
+                raise InvalidTransitionError(
+                    f"Node '{workflow_node_id}' cannot be reopened "
+                    f"(status={target.status.value})"
+                )
+
+        affected.extend(
+            self._invalidate_downstream_nodes(
+                workflow_instance_id=workflow_instance_id,
+                workflow_node_id=workflow_node_id,
+                reason=reason,
+            )
+        )
+
+        was_completed = instance.status == WorkflowStatus.COMPLETED
+        if was_completed:
+            self._workflow_sm.transition(instance.status, WorkflowStatus.RUNNING)
+            self._instances.update_workflow_status(instance, WorkflowStatus.RUNNING)
+        elif affected:
+            self._instances.increment_revision(instance)
+
+        if affected:
+            self._advance(instance, graph)
+
+        return affected
+
     def invalidate_downstream(
+        self,
+        *,
+        workflow_instance_id: str,
+        workflow_node_id: str,
+        reason: str,
+    ) -> list[WorkflowNodeInstance]:
+        return self.reopen_from_task(
+            workflow_instance_id=workflow_instance_id,
+            workflow_node_id=workflow_node_id,
+            reason=reason,
+            reopen_target=False,
+        )
+
+    def _invalidate_downstream_nodes(
         self,
         *,
         workflow_instance_id: str,
@@ -459,13 +538,6 @@ class WorkflowOrchestrator:
             )
             invalidated.append(node_instance)
 
-        if instance.status == WorkflowStatus.COMPLETED:
-            self._workflow_sm.transition(instance.status, WorkflowStatus.RUNNING)
-            self._instances.update_workflow_status(instance, WorkflowStatus.RUNNING)
-
-        if invalidated:
-            self._advance(instance, graph)
-
         return invalidated
 
     def export_instance_excel(self, workflow_instance_id: str) -> tuple[bytes, str]:
@@ -502,9 +574,7 @@ class WorkflowOrchestrator:
         instances = self._instances.list_workflow_instances()
         executions_by_instance: dict[str, list] = {}
         for execution in self._instances.list_all_node_executions():
-            executions_by_instance.setdefault(execution.workflow_instance_id, []).append(
-                execution
-            )
+            executions_by_instance.setdefault(execution.workflow_instance_id, []).append(execution)
 
         events_by_instance: dict[str, list] = {}
         for event in self._events.list_all_workflow_events():
@@ -545,3 +615,37 @@ class WorkflowOrchestrator:
         if version is None:
             raise NodeExecutionError("Workflow definition version not found for instance")
         return WorkflowGraph.from_definition_json(version.definition_json)
+
+    def list_node_executions(self, workflow_instance_id: str) -> list[dict[str, Any]]:
+        instance = self._instances.require_workflow_instance(workflow_instance_id)
+        graph = self._load_graph(instance)
+        node_instances = self._instances.list_node_instances(workflow_instance_id)
+        node_instance_by_id = {node.id: node for node in node_instances}
+        task_names = build_task_names(
+            graph=graph,
+            node_instances=node_instances,
+            definition_repository=self._definitions,
+        )
+        executions = self._instances.list_node_executions(workflow_instance_id)
+
+        rows: list[dict[str, Any]] = []
+        for execution in executions:
+            node_instance = node_instance_by_id.get(execution.workflow_node_instance_id)
+            if node_instance is None:
+                continue
+            rows.append(
+                {
+                    "id": execution.id,
+                    "workflow_node_id": node_instance.workflow_node_id,
+                    "workflow_node_instance_id": execution.workflow_node_instance_id,
+                    "execution_number": execution.execution_number,
+                    "inputs_json": execution.inputs_json,
+                    "outputs_json": execution.outputs_json,
+                    "status": execution.status.value,
+                    "executed_by": execution.executed_by,
+                    "started_at": execution.started_at,
+                    "completed_at": execution.completed_at,
+                    "task_name": task_names.get(node_instance.workflow_node_id),
+                }
+            )
+        return rows

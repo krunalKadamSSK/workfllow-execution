@@ -116,6 +116,9 @@ class ExecutionService:
     def list_events(self, workflow_instance_id: str):
         return self._event_repository.list_events(workflow_instance_id)
 
+    def list_node_executions(self, workflow_instance_id: str):
+        return self._orchestrator.list_node_executions(workflow_instance_id)
+
     def export_instance_excel(self, workflow_instance_id: str) -> tuple[bytes, str]:
         return self._orchestrator.export_instance_excel(workflow_instance_id)
 
@@ -133,4 +136,21 @@ class ExecutionService:
             workflow_instance_id=workflow_instance_id,
             workflow_node_id=workflow_node_id,
             reason=reason,
+        )
+
+    def reopen_from_task(
+        self,
+        *,
+        workflow_instance_id: str,
+        workflow_node_id: str,
+        reason: str,
+        expected_revision: int | None = None,
+        reopen_target: bool = True,
+    ) -> list[WorkflowNodeInstance]:
+        return self._orchestrator.reopen_from_task(
+            workflow_instance_id=workflow_instance_id,
+            workflow_node_id=workflow_node_id,
+            reason=reason,
+            expected_revision=expected_revision,
+            reopen_target=reopen_target,
         )

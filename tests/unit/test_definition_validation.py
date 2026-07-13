@@ -66,7 +66,15 @@ class TestInputWiringValidator:
             general_information_node.id: general_information_node.output_field_ids(),
             raw_material_pricing_node.id: raw_material_pricing_node.output_field_ids(),
         }
-        issues = validate_input_wiring(test_workflow, node_output_fields=node_output_fields)
+        node_input_fields = {
+            general_information_node.id: general_information_node.input_field_ids(),
+            raw_material_pricing_node.id: raw_material_pricing_node.input_field_ids(),
+        }
+        issues = validate_input_wiring(
+            test_workflow,
+            node_output_fields=node_output_fields,
+            node_input_fields=node_input_fields,
+        )
         assert issues == []
 
     def test_unknown_output_key_fails(
@@ -79,7 +87,11 @@ class TestInputWiringValidator:
             general_information_node.id: {"customerName"},
             raw_material_pricing_node.id: raw_material_pricing_node.output_field_ids(),
         }
-        issues = validate_input_wiring(test_workflow, node_output_fields=node_output_fields)
+        issues = validate_input_wiring(
+            test_workflow,
+            node_output_fields=node_output_fields,
+            node_input_fields=node_output_fields,
+        )
         assert any(issue.code == "UNKNOWN_OUTPUT_KEY" for issue in issues)
 
 
@@ -95,10 +107,15 @@ class TestWorkflowValidationPipeline:
             general_information_node.id: general_information_node.output_field_ids(),
             raw_material_pricing_node.id: raw_material_pricing_node.output_field_ids(),
         }
+        node_input_fields = {
+            general_information_node.id: general_information_node.input_field_ids(),
+            raw_material_pricing_node.id: raw_material_pricing_node.input_field_ids(),
+        }
         issues = validate_workflow_definition(
             test_workflow,
             published_node_ids=published_ids,
             node_output_fields=node_output_fields,
+            node_input_fields=node_input_fields,
         )
         assert issues == []
 
@@ -117,3 +134,85 @@ def test_workflow_task_node_name_is_stored_as_label():
     stored_task = workflow.to_stored_json()["nodes"][1]
 
     assert stored_task["label"] == "General information"
+
+
+def test_table_column_input_key_is_valid_input():
+    from app.domain.definitions.table_fields import table_column_input_key
+
+    table_node = NodeDefinitionIngest.model_validate(
+        {
+            "id": "table-node-1",
+            "name": "Table",
+            "slug": "table-node",
+            "status": "published",
+            "version": "1",
+            "baseKind": "table",
+            "appearance": {
+                "icon": {"kind": "lucide", "name": "table"},
+                "color": {"kind": "token", "value": "blue"},
+                "shape": "card",
+                "badge": "Table",
+            },
+            "table": {
+                "columns": [{"id": "customer_name", "type": "text", "label": "Customer"}],
+            },
+            "aggregations": [],
+        }
+    )
+    user_input_node = NodeDefinitionIngest.model_validate(
+        load_json("node_general_information.json")
+    )
+
+    workflow = WorkflowDefinitionIngest.model_validate(
+        {
+            "id": "wf-1",
+            "name": "Table workflow",
+            "slug": "table-workflow",
+            "status": "draft",
+            "version": "1",
+            "nodes": [
+                {"id": "start-1", "kind": "start", "position": {"x": 0, "y": 0}},
+                {
+                    "id": "upstream-1",
+                    "kind": "task",
+                    "nodeDefinitionId": user_input_node.id,
+                    "position": {"x": 100, "y": 0},
+                },
+                {
+                    "id": "table-1",
+                    "kind": "task",
+                    "nodeDefinitionId": table_node.id,
+                    "position": {"x": 200, "y": 0},
+                    "inputs": [
+                        {
+                            "inputKey": table_column_input_key("customer_name"),
+                            "source": {
+                                "kind": "upstream",
+                                "sourceNodeId": "upstream-1",
+                                "outputKey": "customerName",
+                            },
+                        }
+                    ],
+                },
+                {"id": "end-1", "kind": "end", "position": {"x": 300, "y": 0}},
+            ],
+            "edges": [
+                {"id": "e1", "source": "start-1", "target": "upstream-1"},
+                {"id": "e2", "source": "upstream-1", "target": "table-1"},
+                {"id": "e3", "source": "table-1", "target": "end-1"},
+            ],
+        }
+    )
+
+    issues = validate_input_wiring(
+        workflow,
+        node_output_fields={
+            user_input_node.id: user_input_node.output_field_ids(),
+            table_node.id: table_node.output_field_ids(),
+        },
+        node_input_fields={
+            user_input_node.id: user_input_node.input_field_ids(),
+            table_node.id: table_node.input_field_ids(),
+        },
+    )
+    assert issues == []

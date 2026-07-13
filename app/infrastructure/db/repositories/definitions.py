@@ -165,9 +165,7 @@ class DefinitionRepository(BaseRepository):
         return self.session.get(WorkflowDefinitionVersion, version_id)
 
     def list_node_definitions(self) -> list[NodeDefinition]:
-        return list(
-            self.session.scalars(select(NodeDefinition).order_by(NodeDefinition.name))
-        )
+        return list(self.session.scalars(select(NodeDefinition).order_by(NodeDefinition.name)))
 
     def list_workflow_definitions(self) -> list[WorkflowDefinition]:
         return list(

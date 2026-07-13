@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from io import BytesIO
 
-import pytest
 from openpyxl import load_workbook
 
 from app.application.executions.export import (
@@ -18,8 +17,8 @@ class _Instance:
     name = "Demo Run"
     workflow_definition_id = "wf-def-1"
     status = WorkflowStatus.COMPLETED
-    created_at = datetime(2026, 6, 22, 10, 0, tzinfo=timezone.utc)
-    completed_at = datetime(2026, 6, 22, 11, 0, tzinfo=timezone.utc)
+    created_at = datetime(2026, 6, 22, 10, 0, tzinfo=UTC)
+    completed_at = datetime(2026, 6, 22, 11, 0, tzinfo=UTC)
     current_revision = 3
     created_by = "admin"
 
@@ -31,8 +30,8 @@ class _NodeInstance:
         self.node_definition_version_id = "ver-1"
         self.status = status
         self.current_execution = current_execution
-        self.created_at = datetime(2026, 6, 22, 10, 5, tzinfo=timezone.utc)
-        self.updated_at = datetime(2026, 6, 22, 10, 30, tzinfo=timezone.utc)
+        self.created_at = datetime(2026, 6, 22, 10, 5, tzinfo=UTC)
+        self.updated_at = datetime(2026, 6, 22, 10, 30, tzinfo=UTC)
 
 
 class _Execution:
@@ -44,15 +43,15 @@ class _Execution:
         self.outputs_json = {"lineTotal": 15.5, "qty": 10}
         self.status = ExecutionStatus.COMPLETED
         self.executed_by = "admin"
-        self.started_at = datetime(2026, 6, 22, 10, 20, tzinfo=timezone.utc)
-        self.completed_at = datetime(2026, 6, 22, 10, 25, tzinfo=timezone.utc)
+        self.started_at = datetime(2026, 6, 22, 10, 20, tzinfo=UTC)
+        self.completed_at = datetime(2026, 6, 22, 10, 25, tzinfo=UTC)
         self._workflow_node_id = workflow_node_id
 
 
 class _Event:
     sequence_number = 1
     event_type = "WORKFLOW_STARTED"
-    created_at = datetime(2026, 6, 22, 10, 0, tzinfo=timezone.utc)
+    created_at = datetime(2026, 6, 22, 10, 0, tzinfo=UTC)
     payload_json = {"workflow_definition_id": "wf-def-1"}
     created_by = "admin"
 

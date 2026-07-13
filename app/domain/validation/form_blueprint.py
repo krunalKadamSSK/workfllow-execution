@@ -282,8 +282,4 @@ def _cross_field_right_reference(operand: str, field_id_set: set[str]) -> str | 
 
 
 def _is_quoted_literal(operand: str) -> bool:
-    return (
-        len(operand) >= 2
-        and operand[0] == operand[-1]
-        and operand[0] in {"'", '"'}
-    )
+    return len(operand) >= 2 and operand[0] == operand[-1] and operand[0] in {"'", '"'}

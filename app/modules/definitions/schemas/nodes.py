@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.domain.definitions.output_fields import collect_output_field_ids
+from app.domain.definitions.output_fields import collect_input_field_ids, collect_output_field_ids
 
 
 class IconConfig(BaseModel):
@@ -132,16 +132,38 @@ class FormConfig(BaseModel):
     crossFieldConstraints: list[CrossFieldConstraint] = Field(default_factory=list)
 
 
+class TableConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    headerFields: list[FormField] = Field(default_factory=list)
+    columns: list[FormField] = Field(default_factory=list)
+    crossFieldConstraints: list[CrossFieldConstraint] = Field(default_factory=list)
+    minRows: int | None = None
+    maxRows: int | None = None
+    defaultRows: int | None = None
+
+
+class TableAggregation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    label: str
+    columnId: str
+    operation: Literal["sum", "min", "max", "avg", "count"]
+
+
 class NodeDefinitionJson(BaseModel):
     """JSON blob stored in node_definition_versions.definition_json."""
 
     model_config = ConfigDict(extra="allow")
 
-    baseKind: Literal["userInput", "ai", "script"]
+    baseKind: Literal["userInput", "table", "ai", "script"]
     appearance: AppearanceConfig
     description: str | None = None
     output: DeclaredOutput | None = None
     form: FormConfig | None = None
+    table: TableConfig | None = None
+    aggregations: list[TableAggregation] | None = None
 
 
 class NodeDefinitionIngest(BaseModel):
@@ -154,11 +176,13 @@ class NodeDefinitionIngest(BaseModel):
     slug: str
     status: str
     version: str | int
-    baseKind: Literal["userInput", "ai", "script"]
+    baseKind: Literal["userInput", "table", "ai", "script"]
     appearance: AppearanceConfig
     description: str | None = None
     output: DeclaredOutput | None = None
     form: FormConfig | None = None
+    table: TableConfig | None = None
+    aggregations: list[TableAggregation] | None = None
 
     def to_stored_json(self) -> dict:
         payload: dict = NodeDefinitionJson(
@@ -167,10 +191,19 @@ class NodeDefinitionIngest(BaseModel):
             description=self.description,
             output=self.output,
             form=self.form,
+            table=self.table,
+            aggregations=self.aggregations,
         ).model_dump(exclude_none=True)
         if self.baseKind == "userInput" and "form" not in payload:
             payload["form"] = FormConfig().model_dump()
+        if self.baseKind == "table" and "table" not in payload:
+            payload["table"] = TableConfig().model_dump()
+        if self.baseKind == "table" and "aggregations" not in payload:
+            payload["aggregations"] = []
         return payload
 
     def output_field_ids(self) -> set[str]:
         return collect_output_field_ids(self.to_stored_json())
+
+    def input_field_ids(self) -> set[str]:
+        return collect_input_field_ids(self.to_stored_json())

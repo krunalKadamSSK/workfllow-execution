@@ -101,9 +101,7 @@ def test_url_rule():
 def test_uuid_rule():
     validator = FormFieldValidator()
     fields = [{"id": "id", "validation": [{"rule": "uuid", "message": "invalid uuid"}]}]
-    validator.validate_form(
-        fields, {"id": "550e8400-e29b-41d4-a716-446655440000"}
-    )
+    validator.validate_form(fields, {"id": "550e8400-e29b-41d4-a716-446655440000"})
 
 
 def test_cross_field_constraint_passes():

@@ -167,6 +167,39 @@ def test_node_invalidated_recomputes_total():
     assert state["total"] == 15.0
 
 
+def test_node_invalidated_clears_outputs_and_cost_contribution():
+    state = apply_workflow_projection_event(
+        initial_workflow_state(),
+        _event(
+            WorkflowEventType.NODE_COMPLETED.value,
+            {
+                "workflow_node_id": "node-1",
+                "workflow_node_instance_id": "node-inst-1",
+                "execution_number": 1,
+                "outputs": {"inputWeight": 15},
+                "cost_contribution": 15,
+            },
+            sequence=2,
+        ),
+    )
+    state = apply_workflow_projection_event(
+        state,
+        _event(
+            WorkflowEventType.NODE_INVALIDATED.value,
+            {
+                "workflow_node_id": "node-1",
+                "workflow_node_instance_id": "node-inst-1",
+                "reason": "correction",
+            },
+            sequence=3,
+        ),
+    )
+    assert state["nodes"]["node-1"]["status"] == "INVALIDATED"
+    assert "outputs" not in state["nodes"]["node-1"]
+    assert "cost_contribution" not in state["nodes"]["node-1"]
+    assert state["total"] is None
+
+
 def test_workflow_completed_sets_terminal_status():
     state = apply_workflow_projection_event(
         initial_workflow_state(),

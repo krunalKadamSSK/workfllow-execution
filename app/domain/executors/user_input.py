@@ -30,9 +30,7 @@ class UserInputExecutor(BaseNodeExecutor):
         )
         self._validate_declared_output(context, clean_outputs)
 
-    def _validate_declared_output(
-        self, context: ExecutionContext, outputs: dict[str, Any]
-    ) -> None:
+    def _validate_declared_output(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
         output_decl = declared_output(context.definition_json)
         if output_decl is None:
             return
@@ -50,7 +48,7 @@ class UserInputExecutor(BaseNodeExecutor):
                     }
                 ],
             )
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
+        if isinstance(value, bool) or not isinstance(value, int | float):
             raise FieldValidationError(
                 f"Declared output '{output_id}' must be a number",
                 field_errors=[
@@ -64,28 +62,3 @@ class UserInputExecutor(BaseNodeExecutor):
 
     def complete(self, context: ExecutionContext, outputs: dict[str, Any]) -> dict[str, Any]:
         return self._strip_internal_keys(outputs)
-
-    def _validate_locked_inputs(self, context: ExecutionContext, outputs: dict[str, Any]) -> None:
-        errors: list[dict[str, str]] = []
-        for key in context.locked_input_keys:
-            if key not in context.resolved_inputs:
-                continue
-            expected = context.resolved_inputs[key]
-            submitted = outputs.get(key)
-            if submitted != expected:
-                errors.append(
-                    {
-                        "field": key,
-                        "rule": "locked",
-                        "message": f"Field '{key}' is locked to upstream value",
-                    }
-                )
-        if errors:
-            raise FieldValidationError(
-                "Locked upstream inputs were modified",
-                field_errors=errors,
-            )
-
-    @staticmethod
-    def _strip_internal_keys(outputs: dict[str, Any]) -> dict[str, Any]:
-        return {key: value for key, value in outputs.items() if not str(key).startswith("__")}

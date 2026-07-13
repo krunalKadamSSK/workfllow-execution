@@ -217,3 +217,103 @@ class TestExecutionsAPI:
     def test_request_validation_error_shape(self, api_client: TestClient):
         response = api_client.post("/api/v1/instances", json={})
         _assert_error_shape(response, status_code=422, code="VALIDATION_ERROR")
+
+    def test_reopen_from_task_via_api(self, api_client: TestClient):
+        _seed_definitions(api_client)
+
+        start_response = api_client.post(
+            "/api/v1/instances",
+            json={"name": "API Run 6", "workflow_definition_id": WORKFLOW_ID},
+        )
+        instance_id = start_response.json()["id"]
+
+        api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{GENERAL_INFO_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "castingProcess": "GDC",
+                    "volume": 10,
+                }
+            },
+        )
+        api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{RAW_MATERIAL_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "meltLossPercentage": 5,
+                    "rawWeight": 10,
+                    "inputWeight": 15,
+                }
+            },
+        )
+
+        reopen_response = api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{GENERAL_INFO_GRAPH_NODE}/invalidate",
+            json={"reason": "invalid volume"},
+        )
+        assert reopen_response.status_code == 200
+        reopened = reopen_response.json()
+        assert reopened["status"] == "RUNNING"
+        assert reopened["next_task_id"] == GENERAL_INFO_GRAPH_NODE
+        assert GENERAL_INFO_GRAPH_NODE in reopened["pending_node_ids"]
+
+        node_statuses = {
+            node["workflow_node_id"]: node["status"] for node in reopened["node_instances"]
+        }
+        assert node_statuses[GENERAL_INFO_GRAPH_NODE] == "PENDING"
+        assert node_statuses[RAW_MATERIAL_GRAPH_NODE] == "INVALIDATED"
+        assert reopened["total_cost"] is None
+
+        events_response = api_client.get(f"/api/v1/instances/{instance_id}/events")
+        event_types = [event["event_type"] for event in events_response.json()]
+        assert "NODE_INVALIDATED" in event_types
+
+    def test_reopen_revision_conflict_returns_409(self, api_client: TestClient):
+        _seed_definitions(api_client)
+
+        start_response = api_client.post(
+            "/api/v1/instances",
+            json={"name": "API Run 8", "workflow_definition_id": WORKFLOW_ID},
+        )
+        instance_id = start_response.json()["id"]
+
+        response = api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{GENERAL_INFO_GRAPH_NODE}/invalidate",
+            json={"reason": "correction", "expected_revision": 999},
+        )
+        _assert_error_shape(response, status_code=409, code="VERSION_CONFLICT")
+
+    def test_list_node_executions_via_api(self, api_client: TestClient):
+        _seed_definitions(api_client)
+
+        start_response = api_client.post(
+            "/api/v1/instances",
+            json={"name": "API Run 7", "workflow_definition_id": WORKFLOW_ID},
+        )
+        instance_id = start_response.json()["id"]
+
+        api_client.post(
+            f"/api/v1/instances/{instance_id}/nodes/{GENERAL_INFO_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "castingProcess": "GDC",
+                    "volume": 10,
+                }
+            },
+        )
+
+        executions_response = api_client.get(
+            f"/api/v1/instances/{instance_id}/node-executions"
+        )
+        assert executions_response.status_code == 200
+        executions = executions_response.json()
+        assert len(executions) == 1
+        assert executions[0]["workflow_node_id"] == GENERAL_INFO_GRAPH_NODE
+        assert executions[0]["execution_number"] == 1
+        assert executions[0]["task_name"] == "General information"

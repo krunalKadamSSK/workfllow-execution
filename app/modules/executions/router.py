@@ -10,12 +10,15 @@ from app.domain.enums import NodeStatus
 from app.modules.executions.schemas import (
     CurrentTaskResponse,
     ExecutionSummary,
+    InvalidateDownstreamRequest,
     PendingNodeFormResponse,
     StartWorkflowRequest,
     SubmitNodeOutputsRequest,
     WorkflowEventResponse,
     WorkflowInstanceResponse,
+    WorkflowNodeExecutionResponse,
     WorkflowNodeInstanceResponse,
+    WorkflowRevisionRequest,
 )
 
 router = APIRouter(prefix="/instances", tags=["instances"])
@@ -28,12 +31,12 @@ def get_execution_service(session: Session = Depends(get_session)) -> ExecutionS
 def _current_total_cost(state: dict) -> float | None:
     projection = state.get("workflow_projection") or {}
     total = projection.get("total")
-    if isinstance(total, (int, float)) and not isinstance(total, bool):
+    if isinstance(total, int | float) and not isinstance(total, bool):
         return float(total)
 
     summary = state.get("execution_summary") or {}
     summary_total = summary.get("total")
-    if isinstance(summary_total, (int, float)) and not isinstance(summary_total, bool):
+    if isinstance(summary_total, int | float) and not isinstance(summary_total, bool):
         return float(summary_total)
 
     return None
@@ -166,13 +169,40 @@ def submit_node_outputs(
     return _instance_response(state)
 
 
-@router.post("/{instance_id}/pause", response_model=WorkflowInstanceResponse)
-def pause_workflow(
+@router.post(
+    "/{instance_id}/nodes/{workflow_node_id}/invalidate",
+    response_model=WorkflowInstanceResponse,
+)
+def reopen_from_task(
     instance_id: str,
+    workflow_node_id: str,
+    payload: InvalidateDownstreamRequest,
     service: ExecutionService = Depends(get_execution_service),
     session: Session = Depends(get_session),
 ) -> WorkflowInstanceResponse:
-    service.pause_workflow(instance_id)
+    service.reopen_from_task(
+        workflow_instance_id=instance_id,
+        workflow_node_id=workflow_node_id,
+        reason=payload.reason,
+        expected_revision=payload.expected_revision,
+        reopen_target=payload.reopen_target,
+    )
+    session.commit()
+    state = service.get_instance_state(instance_id, after_task_id=workflow_node_id)
+    return _instance_response(state)
+
+
+@router.post("/{instance_id}/pause", response_model=WorkflowInstanceResponse)
+def pause_workflow(
+    instance_id: str,
+    payload: WorkflowRevisionRequest | None = None,
+    service: ExecutionService = Depends(get_execution_service),
+    session: Session = Depends(get_session),
+) -> WorkflowInstanceResponse:
+    service.pause_workflow(
+        instance_id,
+        expected_revision=payload.expected_revision if payload else None,
+    )
     session.commit()
     return _instance_response(service.get_instance_state(instance_id))
 
@@ -180,10 +210,14 @@ def pause_workflow(
 @router.post("/{instance_id}/resume", response_model=WorkflowInstanceResponse)
 def resume_workflow(
     instance_id: str,
+    payload: WorkflowRevisionRequest | None = None,
     service: ExecutionService = Depends(get_execution_service),
     session: Session = Depends(get_session),
 ) -> WorkflowInstanceResponse:
-    service.resume_workflow(instance_id)
+    service.resume_workflow(
+        instance_id,
+        expected_revision=payload.expected_revision if payload else None,
+    )
     session.commit()
     return _instance_response(service.get_instance_state(instance_id))
 
@@ -191,10 +225,14 @@ def resume_workflow(
 @router.post("/{instance_id}/cancel", response_model=WorkflowInstanceResponse)
 def cancel_workflow(
     instance_id: str,
+    payload: WorkflowRevisionRequest | None = None,
     service: ExecutionService = Depends(get_execution_service),
     session: Session = Depends(get_session),
 ) -> WorkflowInstanceResponse:
-    service.cancel_workflow(instance_id)
+    service.cancel_workflow(
+        instance_id,
+        expected_revision=payload.expected_revision if payload else None,
+    )
     session.commit()
     return _instance_response(service.get_instance_state(instance_id))
 
@@ -215,3 +253,15 @@ def list_events(
         )
         for event in events
     ]
+
+
+@router.get(
+    "/{instance_id}/node-executions",
+    response_model=list[WorkflowNodeExecutionResponse],
+)
+def list_node_executions(
+    instance_id: str,
+    service: ExecutionService = Depends(get_execution_service),
+) -> list[WorkflowNodeExecutionResponse]:
+    rows = service.list_node_executions(instance_id)
+    return [WorkflowNodeExecutionResponse(**row) for row in rows]

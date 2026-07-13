@@ -6,6 +6,7 @@ def validate_input_wiring(
     workflow: WorkflowDefinitionIngest,
     *,
     node_output_fields: dict[str, set[str]],
+    node_input_fields: dict[str, set[str]],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     nodes_by_id = {node.id: node for node in workflow.nodes}
@@ -88,7 +89,7 @@ def validate_input_wiring(
                     )
                 )
 
-            task_field_ids = node_output_fields.get(node.nodeDefinitionId or "", set())
+            task_field_ids = node_input_fields.get(node.nodeDefinitionId or "", set())
             if node_input.inputKey not in task_field_ids:
                 issues.append(
                     ValidationIssue(
