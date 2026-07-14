@@ -6,6 +6,11 @@ from app.application.events.event_store import EventStore
 from app.application.executions.input_binder import GraphInputBinder
 from app.application.executions.instance_builder import WorkflowInstanceBuilder
 from app.application.executions.scheduler import GraphScheduler
+from app.application.executions.seed_memento import (
+    SeedDefaultsMemento,
+    SeedDefaultsMementoBuilder,
+    require_seed_source_compatible,
+)
 from app.application.executions.summary import build_execution_summary
 from app.application.executions.task_names import build_task_names, resolve_task_name
 from app.application.executions.upstream_resolver import UpstreamInputResolver
@@ -28,6 +33,7 @@ from app.domain.exceptions import (
 )
 from app.domain.executors.registry import NodeExecutorRegistry
 from app.domain.graph.workflow_graph import WorkflowGraph
+from app.domain.metadata import InstanceMetadata
 from app.domain.ports.executors import ExecutionContext
 from app.domain.state.workflow import WorkflowStateMachine
 from app.infrastructure.db.models import WorkflowInstance, WorkflowNodeInstance
@@ -72,12 +78,34 @@ class WorkflowOrchestrator:
         workflow_definition_id: str,
         version: int | None = None,
         created_by: str | None = None,
+        metadata: dict[str, Any] | InstanceMetadata | None = None,
+        seed_from_instance_id: str | None = None,
     ) -> WorkflowInstance:
+        meta = (
+            metadata
+            if isinstance(metadata, InstanceMetadata)
+            else InstanceMetadata.from_storage(metadata)
+        )
+        seed_defaults: dict[str, Any] = {}
+        if seed_from_instance_id:
+            source = self._instances.require_workflow_instance(seed_from_instance_id)
+            require_seed_source_compatible(
+                source=source,
+                target_workflow_definition_id=workflow_definition_id,
+            )
+            memento = SeedDefaultsMementoBuilder(
+                instance_repository=self._instances,
+                definition_repository=self._definitions,
+            ).build(seed_from_instance_id)
+            seed_defaults = memento.to_storage()
+
         built = self._builder.build(
             name=name,
             workflow_definition_id=workflow_definition_id,
             version=version,
             created_by=created_by,
+            metadata=meta,
+            seed_defaults=seed_defaults,
         )
         snapshot_json = dict(built.workflow_version.definition_json)
 
@@ -97,6 +125,17 @@ class WorkflowOrchestrator:
         self._instances.update_workflow_status(built.instance, WorkflowStatus.RUNNING)
         self._advance(built.instance, built.graph)
         return built.instance
+
+    def list_instances_for_rfq(
+        self,
+        rfq_id: str,
+        *,
+        incomplete_only: bool = False,
+    ) -> list[WorkflowInstance]:
+        return self._instances.list_by_rfq_id(rfq_id, incomplete_only=incomplete_only)
+
+    def has_incomplete_revision(self, rfq_id: str) -> bool:
+        return self._instances.has_incomplete_for_rfq(rfq_id)
 
     def submit_node_outputs(
         self,
@@ -143,6 +182,7 @@ class WorkflowOrchestrator:
             workflow_instance_id=workflow_instance_id,
             graph_node=graph_node,
         )
+        seed_memento = SeedDefaultsMemento.from_storage(instance.seed_defaults_json)
         executor = self._executors.get(definition_json["baseKind"])
         context = ExecutionContext(
             workflow_instance_id=workflow_instance_id,
@@ -154,6 +194,7 @@ class WorkflowOrchestrator:
             resolved_inputs=resolved_inputs.values,
             locked_input_keys=resolved_inputs.locked_keys,
             execution_number=node_instance.current_execution + 1,
+            seed_defaults=seed_memento.for_node(workflow_node_id),
         )
 
         self._instances.update_node_status(node_instance, NodeStatus.RUNNING)
@@ -298,6 +339,8 @@ class WorkflowOrchestrator:
         graph: WorkflowGraph,
     ) -> dict[str, dict[str, Any]]:
         pending_forms: dict[str, dict[str, Any]] = {}
+        instance = self._instances.require_workflow_instance(workflow_instance_id)
+        seed_memento = SeedDefaultsMemento.from_storage(instance.seed_defaults_json)
 
         for node_instance in node_instances:
             if node_instance.status != NodeStatus.PENDING:
@@ -326,6 +369,7 @@ class WorkflowOrchestrator:
                 resolved_inputs=resolved_inputs.values,
                 locked_input_keys=resolved_inputs.locked_keys,
                 execution_number=node_instance.current_execution,
+                seed_defaults=seed_memento.for_node(node_instance.workflow_node_id),
             )
             node_definition = (
                 self._definitions.get_node_definition(graph_node.node_definition_id)

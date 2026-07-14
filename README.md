@@ -25,6 +25,7 @@ uvicorn app.main:app --reload --port 8000
 | Doc | Contents |
 |-----|----------|
 | **[Developer Guide](docs/DEVELOPER_GUIDE.md)** | Folder structure, architecture, runtime flow, API summary, where to change what |
+| **[Database](docs/DATABASE.md)** | Tables, FKs, ER diagram, enums, write flow |
 | [ADR-001](docs/adr/001-architecture-and-standards.md) | SOLID rules, design patterns, error taxonomy |
 
 ## Development

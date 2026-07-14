@@ -317,3 +317,124 @@ class TestExecutionsAPI:
         assert executions[0]["workflow_node_id"] == GENERAL_INFO_GRAPH_NODE
         assert executions[0]["execution_number"] == 1
         assert executions[0]["task_name"] == "General information"
+
+    def test_start_with_rfq_metadata_and_list_by_rfq(self, api_client: TestClient):
+        _seed_definitions(api_client)
+
+        start_response = api_client.post(
+            "/api/v1/instances",
+            json={
+                "name": "RFQ Linked Run",
+                "workflow_definition_id": WORKFLOW_ID,
+                "metadata": {"rfqId": "RFQ-2026-0001", "estimateRevision": "1"},
+            },
+        )
+        assert start_response.status_code == 201
+        body = start_response.json()
+        assert body["metadata"]["rfqId"] == "RFQ-2026-0001"
+        assert body["metadata"]["estimateRevision"] == "1"
+        assert body["rfq_id"] == "RFQ-2026-0001"
+        instance_id = body["id"]
+
+        listed = api_client.get("/api/v1/instances", params={"rfqId": "RFQ-2026-0001"})
+        assert listed.status_code == 200
+        rows = listed.json()
+        assert len(rows) == 1
+        assert rows[0]["id"] == instance_id
+        assert rows[0]["rfq_id"] == "RFQ-2026-0001"
+
+        incomplete = api_client.get("/api/v1/instances/rfq/RFQ-2026-0001/incomplete")
+        assert incomplete.status_code == 200
+        assert incomplete.json() == {
+            "rfq_id": "RFQ-2026-0001",
+            "has_incomplete": True,
+        }
+
+        incomplete_list = api_client.get(
+            "/api/v1/instances",
+            params={"rfqId": "RFQ-2026-0001", "incompleteOnly": True},
+        )
+        assert incomplete_list.status_code == 200
+        assert len(incomplete_list.json()) == 1
+
+    def test_seed_from_previous_instance_static_defaults_only(self, api_client: TestClient):
+        _seed_definitions(api_client)
+
+        first = api_client.post(
+            "/api/v1/instances",
+            json={
+                "name": "Revision 1",
+                "workflow_definition_id": WORKFLOW_ID,
+                "metadata": {"rfqId": "RFQ-2026-0099", "estimateRevision": "1"},
+            },
+        )
+        first_id = first.json()["id"]
+
+        api_client.post(
+            f"/api/v1/instances/{first_id}/nodes/{GENERAL_INFO_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "castingProcess": "GDC",
+                    "volume": 10,
+                }
+            },
+        )
+        api_client.post(
+            f"/api/v1/instances/{first_id}/nodes/{RAW_MATERIAL_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "meltLossPercentage": 5,
+                    "rawWeight": 10,
+                    "inputWeight": 15,
+                }
+            },
+        )
+        assert api_client.get(f"/api/v1/instances/{first_id}").json()["status"] == "COMPLETED"
+
+        reestimate = api_client.post(
+            "/api/v1/instances",
+            json={
+                "name": "Revision 2",
+                "workflow_definition_id": WORKFLOW_ID,
+                "metadata": {"rfqId": "RFQ-2026-0099", "estimateRevision": "2"},
+                "seed_from_instance_id": first_id,
+            },
+        )
+        assert reestimate.status_code == 201
+        second = reestimate.json()
+        assert second["rfq_id"] == "RFQ-2026-0099"
+        assert second["metadata"]["estimateRevision"] == "2"
+
+        form = second["pending_node_forms"][GENERAL_INFO_GRAPH_NODE]
+        fields = {field["id"]: field for field in form["fields"]}
+        assert fields["customerName"]["defaultValue"] == "ACME"
+        assert fields["partName"]["defaultValue"] == "PART-1"
+        assert fields["castingProcess"]["defaultValue"] == "GDC"
+        assert fields["volume"]["defaultValue"] == 10
+
+        # Complete first task so second task becomes pending with seed + upstream.
+        submit_first = api_client.post(
+            f"/api/v1/instances/{second['id']}/nodes/{GENERAL_INFO_GRAPH_NODE}/submit",
+            json={
+                "outputs": {
+                    "customerName": "ACME",
+                    "partName": "PART-1",
+                    "castingProcess": "GDC",
+                    "volume": 10,
+                }
+            },
+        )
+        pricing_form = submit_first.json()["pending_node_forms"][RAW_MATERIAL_GRAPH_NODE]
+        pricing_fields = {field["id"]: field for field in pricing_form["fields"]}
+        assert pricing_fields["meltLossPercentage"]["defaultValue"] == 5
+        # Calculated field must not be seeded from prior revision.
+        assert "defaultValue" not in pricing_fields["inputWeight"]
+
+        incomplete_after_complete = api_client.get(
+            "/api/v1/instances/rfq/RFQ-2026-0099/incomplete"
+        )
+        assert incomplete_after_complete.json()["has_incomplete"] is True

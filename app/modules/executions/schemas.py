@@ -9,6 +9,8 @@ class StartWorkflowRequest(BaseModel):
     workflow_definition_id: str
     version: int | None = None
     created_by: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    seed_from_instance_id: str | None = None
 
 
 class SubmitNodeOutputsRequest(BaseModel):
@@ -81,6 +83,8 @@ class WorkflowInstanceResponse(BaseModel):
     current_revision: int
     created_at: datetime
     completed_at: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    rfq_id: str | None = None
     node_instances: list[WorkflowNodeInstanceResponse] = Field(default_factory=list)
     pending_node_ids: list[str] = Field(default_factory=list)
     current_task: CurrentTaskResponse | None = None
@@ -91,6 +95,27 @@ class WorkflowInstanceResponse(BaseModel):
     workflow_projection: dict[str, Any] | None = None
     execution_summary: ExecutionSummary | None = None
     total_cost: float | None = None
+
+
+class WorkflowInstanceSummaryResponse(BaseModel):
+    """Lightweight instance row for RFQ revision lists."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    workflow_definition_id: str
+    status: str
+    current_revision: int
+    created_at: datetime
+    completed_at: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    rfq_id: str | None = None
+
+
+class RfqIncompleteCheckResponse(BaseModel):
+    rfq_id: str
+    has_incomplete: bool
 
 
 class WorkflowEventResponse(BaseModel):

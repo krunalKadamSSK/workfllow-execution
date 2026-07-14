@@ -15,6 +15,8 @@ class ExecutionContext:
     resolved_inputs: dict[str, Any] = field(default_factory=dict)
     locked_input_keys: frozenset[str] = field(default_factory=frozenset)
     execution_number: int = 0
+    # Static defaults from a prior revision (Memento); never override upstream locks.
+    seed_defaults: dict[str, Any] = field(default_factory=dict)
 
 
 @runtime_checkable

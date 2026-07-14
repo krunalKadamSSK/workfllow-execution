@@ -60,13 +60,30 @@ class ExecutionService:
         workflow_definition_id: str,
         version: int | None = None,
         created_by: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        seed_from_instance_id: str | None = None,
     ) -> WorkflowInstance:
         return self._orchestrator.start_workflow(
             name=name,
             workflow_definition_id=workflow_definition_id,
             version=version,
             created_by=created_by,
+            metadata=metadata,
+            seed_from_instance_id=seed_from_instance_id,
         )
+
+    def list_instances_for_rfq(
+        self,
+        rfq_id: str,
+        *,
+        incomplete_only: bool = False,
+    ) -> list[WorkflowInstance]:
+        return self._orchestrator.list_instances_for_rfq(
+            rfq_id, incomplete_only=incomplete_only
+        )
+
+    def has_incomplete_revision(self, rfq_id: str) -> bool:
+        return self._orchestrator.has_incomplete_revision(rfq_id)
 
     def submit_node_outputs(
         self,

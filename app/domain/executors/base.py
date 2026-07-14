@@ -16,13 +16,15 @@ class BaseNodeExecutor:
     def prepare(self, context: ExecutionContext) -> dict[str, Any]:
         fields = self._form_fields(context)
         if not fields:
-            return dict(context.resolved_inputs)
+            return {**dict(context.seed_defaults), **dict(context.resolved_inputs)}
 
         defaults: dict[str, Any] = {}
         for field in fields:
             field_id = str(field["id"])
             if field_id in context.resolved_inputs:
                 defaults[field_id] = context.resolved_inputs[field_id]
+            elif field_id in context.seed_defaults:
+                defaults[field_id] = context.seed_defaults[field_id]
         return defaults
 
     def prepare_form_fields(self, context: ExecutionContext) -> list[dict[str, Any]]:
@@ -32,6 +34,8 @@ class BaseNodeExecutor:
             field_id = str(field["id"])
             if field_id in context.resolved_inputs:
                 enriched["defaultValue"] = context.resolved_inputs[field_id]
+            elif field_id in context.seed_defaults:
+                enriched["defaultValue"] = context.seed_defaults[field_id]
             fields.append(enriched)
         return fields
 

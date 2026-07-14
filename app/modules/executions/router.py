@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -12,10 +12,12 @@ from app.modules.executions.schemas import (
     ExecutionSummary,
     InvalidateDownstreamRequest,
     PendingNodeFormResponse,
+    RfqIncompleteCheckResponse,
     StartWorkflowRequest,
     SubmitNodeOutputsRequest,
     WorkflowEventResponse,
     WorkflowInstanceResponse,
+    WorkflowInstanceSummaryResponse,
     WorkflowNodeExecutionResponse,
     WorkflowNodeInstanceResponse,
     WorkflowRevisionRequest,
@@ -42,6 +44,11 @@ def _current_total_cost(state: dict) -> float | None:
     return None
 
 
+def _instance_metadata(instance) -> dict:
+    raw = getattr(instance, "instance_metadata", None)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
 def _instance_response(state: dict) -> WorkflowInstanceResponse:
     instance = state["instance"]
     pending_node_ids = [
@@ -65,6 +72,8 @@ def _instance_response(state: dict) -> WorkflowInstanceResponse:
         current_revision=instance.current_revision,
         created_at=instance.created_at,
         completed_at=instance.completed_at,
+        metadata=_instance_metadata(instance),
+        rfq_id=instance.rfq_id,
         node_instances=[
             WorkflowNodeInstanceResponse(
                 id=node.id,
@@ -95,6 +104,20 @@ def _instance_response(state: dict) -> WorkflowInstanceResponse:
     )
 
 
+def _instance_summary(instance) -> WorkflowInstanceSummaryResponse:
+    return WorkflowInstanceSummaryResponse(
+        id=instance.id,
+        name=instance.name,
+        workflow_definition_id=instance.workflow_definition_id,
+        status=instance.status.value,
+        current_revision=instance.current_revision,
+        created_at=instance.created_at,
+        completed_at=instance.completed_at,
+        metadata=_instance_metadata(instance),
+        rfq_id=instance.rfq_id,
+    )
+
+
 @router.post("", response_model=WorkflowInstanceResponse, status_code=201)
 def start_workflow(
     payload: StartWorkflowRequest,
@@ -106,10 +129,36 @@ def start_workflow(
         workflow_definition_id=payload.workflow_definition_id,
         version=payload.version,
         created_by=payload.created_by,
+        metadata=payload.metadata,
+        seed_from_instance_id=payload.seed_from_instance_id,
     )
     session.commit()
     state = service.get_instance_state(instance.id)
     return _instance_response(state)
+
+
+@router.get("", response_model=list[WorkflowInstanceSummaryResponse])
+def list_instances(
+    rfqId: str = Query(..., min_length=1, description="RFQ id to list workflow revisions for"),
+    incompleteOnly: bool = Query(
+        False,
+        description="When true, only PENDING/RUNNING/PAUSED instances are returned",
+    ),
+    service: ExecutionService = Depends(get_execution_service),
+) -> list[WorkflowInstanceSummaryResponse]:
+    instances = service.list_instances_for_rfq(rfqId, incomplete_only=incompleteOnly)
+    return [_instance_summary(instance) for instance in instances]
+
+
+@router.get("/rfq/{rfq_id}/incomplete", response_model=RfqIncompleteCheckResponse)
+def check_incomplete_revision(
+    rfq_id: str,
+    service: ExecutionService = Depends(get_execution_service),
+) -> RfqIncompleteCheckResponse:
+    return RfqIncompleteCheckResponse(
+        rfq_id=rfq_id,
+        has_incomplete=service.has_incomplete_revision(rfq_id),
+    )
 
 
 @router.get("/export")
@@ -188,7 +237,8 @@ def reopen_from_task(
         reopen_target=payload.reopen_target,
     )
     session.commit()
-    state = service.get_instance_state(instance_id, after_task_id=workflow_node_id)
+    # Reopened node is the current work item; do not skip it via after_task_id.
+    state = service.get_instance_state(instance_id)
     return _instance_response(state)
 
 
