@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.application.events.event_store import EventStore
+from app.application.executions.definition_maps import load_node_definition_maps
 from app.application.executions.input_binder import GraphInputBinder
 from app.application.executions.instance_builder import WorkflowInstanceBuilder
 from app.application.executions.scheduler import GraphScheduler
@@ -40,7 +41,10 @@ from app.infrastructure.db.models import WorkflowInstance, WorkflowNodeInstance
 from app.infrastructure.db.repositories.definitions import DefinitionRepository
 from app.infrastructure.db.repositories.instances import InstanceRepository
 from app.infrastructure.db.repositories.projections import ProjectionRepository
-from app.infrastructure.executions.projection_reader import DbNodeProjectionReader
+from app.infrastructure.executions.projection_reader import (
+    DbNodeProjectionReader,
+    PrefetchedNodeProjectionReader,
+)
 
 
 class WorkflowOrchestrator:
@@ -280,10 +284,19 @@ class WorkflowOrchestrator:
         node_instances = self._instances.list_node_instances(workflow_instance_id)
         workflow_state = self._projections.get_workflow_state(workflow_instance_id)
         graph = self._load_graph(instance)
+        definition_maps = load_node_definition_maps(
+            self._definitions,
+            node_instances,
+            extra_definition_ids={
+                node.node_definition_id
+                for node in graph.task_nodes
+                if node.node_definition_id is not None
+            },
+        )
         task_names = build_task_names(
             graph=graph,
             node_instances=node_instances,
-            definition_repository=self._definitions,
+            definition_maps=definition_maps,
         )
         next_task_id = self._resolve_next_task_id(
             graph, node_instances, after_task_id=after_task_id
@@ -296,14 +309,17 @@ class WorkflowOrchestrator:
                 graph=graph,
                 workflow_projection=workflow_state,
                 node_instances=node_instances,
-                definition_repository=self._definitions,
                 task_names=task_names,
+                definition_maps=definition_maps,
             ),
             "task_names": task_names,
             "next_task_id": next_task_id,
             "next_task_name": task_names.get(next_task_id) if next_task_id else None,
             "pending_node_forms": self._prepare_pending_node_forms(
-                workflow_instance_id, node_instances, graph
+                workflow_instance_id,
+                node_instances,
+                graph,
+                definition_maps=definition_maps,
             ),
         }
 
@@ -337,24 +353,37 @@ class WorkflowOrchestrator:
         workflow_instance_id: str,
         node_instances: list[WorkflowNodeInstance],
         graph: WorkflowGraph,
+        *,
+        definition_maps=None,
     ) -> dict[str, dict[str, Any]]:
         pending_forms: dict[str, dict[str, Any]] = {}
         instance = self._instances.require_workflow_instance(workflow_instance_id)
         seed_memento = SeedDefaultsMemento.from_storage(instance.seed_defaults_json)
+
+        maps = definition_maps or load_node_definition_maps(self._definitions, node_instances)
+        statuses_by_graph_id = {node.workflow_node_id: node.status for node in node_instances}
+        input_binder = GraphInputBinder(
+            UpstreamInputResolver(
+                PrefetchedNodeProjectionReader(
+                    values_by_graph_id=self._projections.get_node_values_map_for_instance(
+                        workflow_instance_id
+                    ),
+                    statuses_by_graph_id=statuses_by_graph_id,
+                )
+            )
+        )
 
         for node_instance in node_instances:
             if node_instance.status != NodeStatus.PENDING:
                 continue
 
             graph_node = graph.require_node(node_instance.workflow_node_id)
-            node_version = self._definitions.get_node_definition_version_by_id(
-                node_instance.node_definition_version_id
-            )
+            node_version = maps.versions_by_id.get(node_instance.node_definition_version_id)
             if node_version is None:
                 continue
 
             definition_json = node_version.definition_json
-            resolved_inputs = self._input_binder.resolve(
+            resolved_inputs = input_binder.resolve(
                 workflow_instance_id=workflow_instance_id,
                 graph_node=graph_node,
             )
@@ -372,7 +401,7 @@ class WorkflowOrchestrator:
                 seed_defaults=seed_memento.for_node(node_instance.workflow_node_id),
             )
             node_definition = (
-                self._definitions.get_node_definition(graph_node.node_definition_id)
+                maps.definitions_by_id.get(graph_node.node_definition_id)
                 if graph_node.node_definition_id
                 else None
             )
@@ -553,12 +582,14 @@ class WorkflowOrchestrator:
         instance = self._instances.require_workflow_instance(workflow_instance_id)
         graph = self._load_graph(instance)
         scheduler = GraphScheduler(graph)
+        node_instances_by_graph_id = {
+            node.workflow_node_id: node
+            for node in self._instances.list_node_instances(workflow_instance_id)
+        }
         invalidated: list[WorkflowNodeInstance] = []
 
         for graph_node in scheduler.downstream_task_nodes(workflow_node_id):
-            node_instance = self._instances.get_node_instance_by_graph_id(
-                workflow_instance_id, graph_node.id
-            )
+            node_instance = node_instances_by_graph_id.get(graph_node.id)
             if node_instance is None:
                 continue
             if node_instance.status not in {
@@ -625,16 +656,15 @@ class WorkflowOrchestrator:
             events_by_instance.setdefault(event.workflow_instance_id, []).append(event)
 
         workflow_names: dict[str, str | None] = {}
+        definition_ids = {instance.workflow_definition_id for instance in instances}
+        definitions_by_id = self._definitions.get_workflow_definitions_by_ids(definition_ids)
+        for definition_id, definition in definitions_by_id.items():
+            workflow_names[definition_id] = definition.name
+        for definition_id in definition_ids:
+            workflow_names.setdefault(definition_id, None)
+
         contexts: list[InstanceExportContext] = []
         for instance in instances:
-            if instance.workflow_definition_id not in workflow_names:
-                definition = self._definitions.get_workflow_definition(
-                    instance.workflow_definition_id
-                )
-                workflow_names[instance.workflow_definition_id] = (
-                    definition.name if definition is not None else None
-                )
-
             contexts.append(
                 InstanceExportContext(
                     instance=instance,
@@ -665,10 +695,19 @@ class WorkflowOrchestrator:
         graph = self._load_graph(instance)
         node_instances = self._instances.list_node_instances(workflow_instance_id)
         node_instance_by_id = {node.id: node for node in node_instances}
+        definition_maps = load_node_definition_maps(
+            self._definitions,
+            node_instances,
+            extra_definition_ids={
+                node.node_definition_id
+                for node in graph.task_nodes
+                if node.node_definition_id is not None
+            },
+        )
         task_names = build_task_names(
             graph=graph,
             node_instances=node_instances,
-            definition_repository=self._definitions,
+            definition_maps=definition_maps,
         )
         executions = self._instances.list_node_executions(workflow_instance_id)
 

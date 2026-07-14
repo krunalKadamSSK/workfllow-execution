@@ -1,6 +1,7 @@
+from collections.abc import Iterable
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.exc import IntegrityError
 
 from app.domain.exceptions import DuplicateSlugError, NotFoundError
@@ -86,6 +87,113 @@ class DefinitionRepository(BaseRepository):
 
     def get_node_definition_version_by_id(self, version_id: str) -> NodeDefinitionVersion | None:
         return self.session.get(NodeDefinitionVersion, version_id)
+
+    def get_node_definitions_by_ids(
+        self, definition_ids: Iterable[str]
+    ) -> dict[str, NodeDefinition]:
+        unique_ids = {definition_id for definition_id in definition_ids if definition_id}
+        if not unique_ids:
+            return {}
+        rows = self.session.scalars(
+            select(NodeDefinition).where(NodeDefinition.id.in_(unique_ids))
+        )
+        return {row.id: row for row in rows}
+
+    def get_node_definition_versions_by_ids(
+        self, version_ids: Iterable[str]
+    ) -> dict[str, NodeDefinitionVersion]:
+        unique_ids = {version_id for version_id in version_ids if version_id}
+        if not unique_ids:
+            return {}
+        rows = self.session.scalars(
+            select(NodeDefinitionVersion).where(NodeDefinitionVersion.id.in_(unique_ids))
+        )
+        return {row.id: row for row in rows}
+
+    def get_workflow_definitions_by_ids(
+        self, definition_ids: Iterable[str]
+    ) -> dict[str, WorkflowDefinition]:
+        unique_ids = {definition_id for definition_id in definition_ids if definition_id}
+        if not unique_ids:
+            return {}
+        rows = self.session.scalars(
+            select(WorkflowDefinition).where(WorkflowDefinition.id.in_(unique_ids))
+        )
+        return {row.id: row for row in rows}
+
+    def get_published_node_definitions_with_latest_versions(
+        self, definition_ids: Iterable[str]
+    ) -> dict[str, tuple[NodeDefinition, NodeDefinitionVersion]]:
+        definitions = self.get_node_definitions_by_ids(definition_ids)
+        published = [
+            definition
+            for definition in definitions.values()
+            if definition.status == "published"
+        ]
+        if not published:
+            return {}
+
+        version_keys = [(definition.id, definition.latest_version) for definition in published]
+        versions = {
+            (version.node_definition_id, version.version): version
+            for version in self.session.scalars(
+                select(NodeDefinitionVersion).where(
+                    tuple_(
+                        NodeDefinitionVersion.node_definition_id,
+                        NodeDefinitionVersion.version,
+                    ).in_(version_keys)
+                )
+            )
+        }
+
+        resolved: dict[str, tuple[NodeDefinition, NodeDefinitionVersion]] = {}
+        for definition in published:
+            version = versions.get((definition.id, definition.latest_version))
+            if version is not None:
+                resolved[definition.id] = (definition, version)
+        return resolved
+
+    def pin_latest_node_versions(
+        self, node_definition_ids: Iterable[str]
+    ) -> dict[str, NodeDefinitionVersion]:
+        """Return latest pinned versions keyed by node definition id."""
+        unique_ids = list(dict.fromkeys(node_definition_ids))
+        if not unique_ids:
+            return {}
+
+        definitions = self.get_node_definitions_by_ids(unique_ids)
+        missing = [
+            definition_id for definition_id in unique_ids if definition_id not in definitions
+        ]
+        if missing:
+            raise NotFoundError(f"Node definition not found: {missing[0]}")
+
+        version_keys = [
+            (definition.id, definition.latest_version) for definition in definitions.values()
+        ]
+        versions = {
+            (version.node_definition_id, version.version): version
+            for version in self.session.scalars(
+                select(NodeDefinitionVersion).where(
+                    tuple_(
+                        NodeDefinitionVersion.node_definition_id,
+                        NodeDefinitionVersion.version,
+                    ).in_(version_keys)
+                )
+            )
+        }
+
+        pinned: dict[str, NodeDefinitionVersion] = {}
+        for definition_id in unique_ids:
+            definition = definitions[definition_id]
+            version = versions.get((definition.id, definition.latest_version))
+            if version is None:
+                raise NotFoundError(
+                    "Node definition version not found: "
+                    f"{definition.id} v{definition.latest_version}"
+                )
+            pinned[definition_id] = version
+        return pinned
 
     def create_workflow_definition(
         self,

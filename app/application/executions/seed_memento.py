@@ -74,6 +74,13 @@ class SeedDefaultsMementoBuilder:
         node_instances = self._instances.list_node_instances(source_instance_id)
         node_by_id = {node.id: node for node in node_instances}
         latest = self._latest_completed_by_node(source_instance_id, node_by_id)
+        versions_by_id = self._definitions.get_node_definition_versions_by_ids(
+            {
+                node.node_definition_version_id
+                for node in node_instances
+                if node.node_definition_version_id
+            }
+        )
 
         defaults_by_node: dict[str, dict[str, Any]] = {}
         for workflow_node_id, execution in latest.items():
@@ -83,9 +90,7 @@ class SeedDefaultsMementoBuilder:
             )
             if node_instance is None:
                 continue
-            node_version = self._definitions.get_node_definition_version_by_id(
-                node_instance.node_definition_version_id
-            )
+            node_version = versions_by_id.get(node_instance.node_definition_version_id)
             if node_version is None:
                 continue
             defaults_by_node[workflow_node_id] = self._static_defaults_for_definition(

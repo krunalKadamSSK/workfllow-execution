@@ -33,3 +33,30 @@ class DbNodeProjectionReader:
         if values is None or len(values) == 0:
             return None
         return values
+
+
+class PrefetchedNodeProjectionReader:
+    """In-memory NodeProjectionReader backed by batch-loaded maps."""
+
+    def __init__(
+        self,
+        *,
+        values_by_graph_id: dict[str, dict[str, Any]],
+        statuses_by_graph_id: dict[str, NodeStatus],
+    ) -> None:
+        self._values_by_graph_id = values_by_graph_id
+        self._statuses_by_graph_id = statuses_by_graph_id
+
+    def get_node_values(
+        self,
+        *,
+        workflow_instance_id: str,
+        workflow_node_id: str,
+    ) -> dict[str, Any] | None:
+        _ = workflow_instance_id
+        if self._statuses_by_graph_id.get(workflow_node_id) != NodeStatus.COMPLETED:
+            return None
+        values = self._values_by_graph_id.get(workflow_node_id)
+        if values is None or len(values) == 0:
+            return None
+        return values

@@ -62,9 +62,16 @@ class WorkflowInstanceBuilder:
         )
 
         node_instances: dict[str, WorkflowNodeInstance] = {}
+        pinned_versions = self._definitions.pin_latest_node_versions(
+            [
+                task_node.node_definition_id
+                for task_node in graph.task_nodes
+                if task_node.node_definition_id is not None
+            ]
+        )
         for task_node in graph.task_nodes:
             assert task_node.node_definition_id is not None
-            node_version = self._definitions.pin_node_version(task_node.node_definition_id)
+            node_version = pinned_versions[task_node.node_definition_id]
             node_instance = self._instances.create_node_instance(
                 workflow_instance_id=instance.id,
                 workflow_node_id=task_node.id,

@@ -47,7 +47,9 @@ def test_resolve_task_name_uses_workflow_node_name_field():
 
 
 class _Version:
-    def __init__(self, definition_json: dict):
+    def __init__(self, *, node_definition_id: str, definition_json: dict):
+        self.id = "ver"
+        self.node_definition_id = node_definition_id
         self.definition_json = definition_json
 
 
@@ -65,19 +67,26 @@ class _NodeDefinition:
 class _DefinitionRepository:
     def __init__(
         self,
-        versions: dict[str, dict],
+        versions: dict[str, _Version],
         definitions: dict[str, str] | None = None,
     ):
         self._versions = versions
         self._definitions = definitions or {}
 
-    def get_node_definition_version_by_id(self, version_id: str):
-        payload = self._versions.get(version_id)
-        return _Version(payload) if payload is not None else None
+    def get_node_definition_versions_by_ids(self, version_ids):
+        return {
+            version_id: self._versions[version_id]
+            for version_id in version_ids
+            if version_id in self._versions
+        }
 
-    def get_node_definition(self, definition_id: str):
-        name = self._definitions.get(definition_id)
-        return _NodeDefinition(name) if name is not None else None
+    def get_node_definitions_by_ids(self, definition_ids):
+        result = {}
+        for definition_id in definition_ids:
+            name = self._definitions.get(definition_id)
+            if name is not None:
+                result[definition_id] = _NodeDefinition(name)
+        return result
 
 
 def test_build_task_names_maps_all_tasks():
@@ -101,7 +110,12 @@ def test_build_task_names_maps_all_tasks():
         }
     )
     repo = _DefinitionRepository(
-        {"ver-1": {"baseKind": "userInput"}},
+        {
+            "ver-1": _Version(
+                node_definition_id="def-1",
+                definition_json={"baseKind": "userInput"},
+            )
+        },
         definitions={"def-1": "Raw Material Pricing"},
     )
     names = build_task_names(

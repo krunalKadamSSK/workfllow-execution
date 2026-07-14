@@ -77,12 +77,14 @@ class DefinitionIngestService:
         created_by: str | None = None,
     ) -> tuple[WorkflowDefinition, WorkflowDefinitionVersion]:
         slug = payload.required_slug
-        published_node_ids, node_output_fields = self._resolve_task_node_definitions(payload)
+        published_node_ids, node_output_fields, node_input_fields = (
+            self._resolve_task_node_fields(payload)
+        )
         issues = validate_workflow_definition(
             payload,
             published_node_ids=published_node_ids,
             node_output_fields=node_output_fields,
-            node_input_fields=self._resolve_task_node_input_fields(payload),
+            node_input_fields=node_input_fields,
         )
         if issues:
             raise ValidationError(
@@ -191,46 +193,23 @@ class DefinitionIngestService:
         )
         return existing, version
 
-    def _resolve_task_node_definitions(
+    def _resolve_task_node_fields(
         self, payload: WorkflowDefinitionIngest
-    ) -> tuple[set[str], dict[str, set[str]]]:
+    ) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]]]:
+        definition_ids = {
+            node.nodeDefinitionId
+            for node in payload.task_nodes()
+            if node.nodeDefinitionId is not None
+        }
+        resolved = self._repo.get_published_node_definitions_with_latest_versions(definition_ids)
+
         published_node_ids: set[str] = set()
         node_output_fields: dict[str, set[str]] = {}
-
-        for node in payload.task_nodes():
-            assert node.nodeDefinitionId is not None
-            definition = self._repo.get_node_definition(node.nodeDefinitionId)
-            if definition is None or definition.status != "published":
-                continue
-
-            published_node_ids.add(definition.id)
-            version = self._repo.get_node_definition_version(
-                definition.id, definition.latest_version
-            )
-            if version is None:
-                continue
-
-            node_output_fields[definition.id] = collect_output_field_ids(version.definition_json)
-
-        return published_node_ids, node_output_fields
-
-    def _resolve_task_node_input_fields(
-        self, payload: WorkflowDefinitionIngest
-    ) -> dict[str, set[str]]:
         node_input_fields: dict[str, set[str]] = {}
 
-        for node in payload.task_nodes():
-            assert node.nodeDefinitionId is not None
-            definition = self._repo.get_node_definition(node.nodeDefinitionId)
-            if definition is None or definition.status != "published":
-                continue
+        for definition_id, (_definition, version) in resolved.items():
+            published_node_ids.add(definition_id)
+            node_output_fields[definition_id] = collect_output_field_ids(version.definition_json)
+            node_input_fields[definition_id] = collect_input_field_ids(version.definition_json)
 
-            version = self._repo.get_node_definition_version(
-                definition.id, definition.latest_version
-            )
-            if version is None:
-                continue
-
-            node_input_fields[definition.id] = collect_input_field_ids(version.definition_json)
-
-        return node_input_fields
+        return published_node_ids, node_output_fields, node_input_fields
