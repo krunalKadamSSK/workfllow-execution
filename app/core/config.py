@@ -46,7 +46,9 @@ class Settings(BaseSettings):
     BACKUP_ENABLED: bool = True
     BACKUP_STORAGE_DIR: str = "backups"
     BACKUP_DEPLOYMENT_MODE: Literal["docker", "local", "remote"] = "docker"
+    BACKUP_OS: Literal["auto", "windows", "linux", "darwin"] = "auto"
     BACKUP_DOCKER_CONTAINER: str = "workflow_engine_postgres"
+    BACKUP_DOCKER_CLI: str = ""
     BACKUP_POSTGRES_USER: str = "workflow"
     BACKUP_TOOL_PATH: str = ""
     BACKUP_RETENTION_COUNT: int = 20
