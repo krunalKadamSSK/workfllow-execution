@@ -45,6 +45,26 @@ make db-psql               # interactive psql shell
 make db-reset              # wipe data and re-migrate (destructive)
 ```
 
+### Backup & Restore
+
+**Linux / macOS (Makefile):**
+
+```bash
+make db-backup                              # timestamped dump in backups/
+make db-backup BACKUP_FILE=backups/my.dump  # custom path
+make db-restore BACKUP_FILE=backups/my.dump # restore from dump
+```
+
+**Windows (cmd.exe):**
+
+```bat
+db.bat backup                               # timestamped dump in backups\
+db.bat backup backups\my.dump               # custom path
+db.bat restore backups\my.dump              # restore from dump
+```
+
+Dumps use `pg_dump -Fc` (custom format) and are cross-platform — a backup taken on Windows can be restored on Linux/macOS and vice versa.
+
 Full reference: [docs/DEVELOPER_GUIDE.md — PostgreSQL](docs/DEVELOPER_GUIDE.md#postgresql)
 
 ## Services (docker-compose)
