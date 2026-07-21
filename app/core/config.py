@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     LOG_JSON: bool = False
     EVENT_HASH_CHAIN: bool = False
 
+    BACKUP_ENABLED: bool = True
+    BACKUP_STORAGE_DIR: str = "backups"
+    BACKUP_DEPLOYMENT_MODE: Literal["docker", "local", "remote"] = "docker"
+    BACKUP_DOCKER_CONTAINER: str = "workflow_engine_postgres"
+    BACKUP_POSTGRES_USER: str = "workflow"
+    BACKUP_TOOL_PATH: str = ""
+    BACKUP_RETENTION_COUNT: int = 20
+    BACKUP_ALLOW_RESTORE: bool = True
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def _normalize_database_url(cls, value: str) -> str:
