@@ -8,7 +8,6 @@ from app.core.config import settings
 from app.core.cors import setup_cors
 from app.core.logging import setup_logging
 from app.core.middleware import RequestContextMiddleware
-from app.modules.backups.router import router as backups_router
 from app.modules.definitions.router import router as definitions_router
 from app.modules.executions.router import router as executions_router
 
@@ -30,6 +29,5 @@ setup_cors(app)
 register_exception_handlers(app)
 
 app.include_router(health_router)
-app.include_router(backups_router)
 app.include_router(definitions_router, prefix=settings.API_V1_PREFIX)
 app.include_router(executions_router, prefix=settings.API_V1_PREFIX)
