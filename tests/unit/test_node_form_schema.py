@@ -1,11 +1,11 @@
-from app.domain.validation.form_blueprint import validate_form_blueprint
-from app.modules.definitions.schemas.nodes import (
+from app.api.schemas.v1.definitions.nodes import (
     AppearanceConfig,
     ColorConfig,
     FormConfig,
     IconConfig,
     NodeDefinitionIngest,
 )
+from app.domain.validation.form_blueprint import validate_form_blueprint
 
 
 def _appearance() -> AppearanceConfig:

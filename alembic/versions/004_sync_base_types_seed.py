@@ -11,7 +11,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-from app.infrastructure.db.seeds.base_types import BASE_TYPES_SEED
+from app.infrastructure.persistence.seeds.base_types import BASE_TYPES_SEED
 
 revision: str = "004_sync_base_types"
 down_revision: Union[str, Sequence[str], None] = "003_table_base_type"

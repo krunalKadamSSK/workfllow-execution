@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
+from app.api.schemas.v1.definitions.nodes import NodeDefinitionIngest
+from app.api.schemas.v1.definitions.workflows import WorkflowDefinitionIngest
 from app.domain.validation.graph import validate_graph_topology, validate_node_references
 from app.domain.validation.input_wiring import validate_input_wiring
 from app.domain.validation.pipeline import validate_workflow_definition
-from app.modules.definitions.schemas.nodes import NodeDefinitionIngest
-from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 

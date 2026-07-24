@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 from app.application.executions.summary import build_execution_summary
 from app.domain.graph.workflow_graph import GraphNode, WorkflowGraph
-from app.infrastructure.db.models.instances import WorkflowNodeInstance
+from app.infrastructure.persistence.models.instances import WorkflowNodeInstance
 
 
 def _node_instance(graph_node_id: str, version_id: str) -> WorkflowNodeInstance:

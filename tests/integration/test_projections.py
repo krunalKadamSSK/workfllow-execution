@@ -1,16 +1,16 @@
 import pytest
 
-from app.infrastructure.db.repositories.projections import ProjectionRepository
 from app.infrastructure.executions.projection_reader import DbNodeProjectionReader
+from app.infrastructure.persistence.repositories.projections import ProjectionRepository
 
 pytestmark = pytest.mark.integration
 
 
 class TestProjectionRepository:
     def test_upsert_and_read_node_projection(self, db_session):
-        from app.infrastructure.db.models import NodeStatus, WorkflowStatus
-        from app.infrastructure.db.repositories.definitions import DefinitionRepository
-        from app.infrastructure.db.repositories.instances import InstanceRepository
+        from app.infrastructure.persistence.models import NodeStatus, WorkflowStatus
+        from app.infrastructure.persistence.repositories.definitions import DefinitionRepository
+        from app.infrastructure.persistence.repositories.instances import InstanceRepository
 
         definitions = DefinitionRepository(db_session)
         instances = InstanceRepository(db_session)

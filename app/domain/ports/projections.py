@@ -1,15 +1,5 @@
-from __future__ import annotations
+"""Compatibility shim — prefer ``node_projection_reader``."""
 
-from typing import Any, Protocol, runtime_checkable
+from app.domain.ports.node_projection_reader import NodeProjectionReader
 
-
-@runtime_checkable
-class NodeProjectionReader(Protocol):
-    """Reads materialized node output values for upstream input resolution."""
-
-    def get_node_values(
-        self,
-        *,
-        workflow_instance_id: str,
-        workflow_node_id: str,
-    ) -> dict[str, Any] | None: ...
+__all__ = ["NodeProjectionReader"]

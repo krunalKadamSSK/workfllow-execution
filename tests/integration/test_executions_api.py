@@ -132,7 +132,9 @@ class TestExecutionsAPI:
 
         events_response = api_client.get(f"/api/v1/instances/{instance_id}/events")
         assert events_response.status_code == 200
-        event_types = [event["event_type"] for event in events_response.json()]
+        events_body = events_response.json()
+        assert "items" in events_body
+        event_types = [event["event_type"] for event in events_body["items"]]
         assert "WORKFLOW_STARTED" in event_types
         assert "NODE_COMPLETED" in event_types
         assert "WORKFLOW_COMPLETED" in event_types
@@ -269,7 +271,7 @@ class TestExecutionsAPI:
         assert reopened["total_cost"] is None
 
         events_response = api_client.get(f"/api/v1/instances/{instance_id}/events")
-        event_types = [event["event_type"] for event in events_response.json()]
+        event_types = [event["event_type"] for event in events_response.json()["items"]]
         assert "NODE_INVALIDATED" in event_types
 
     def test_reopen_revision_conflict_returns_409(self, api_client: TestClient):
@@ -312,7 +314,9 @@ class TestExecutionsAPI:
             f"/api/v1/instances/{instance_id}/node-executions"
         )
         assert executions_response.status_code == 200
-        executions = executions_response.json()
+        executions_body = executions_response.json()
+        assert executions_body["total"] == 1
+        executions = executions_body["items"]
         assert len(executions) == 1
         assert executions[0]["workflow_node_id"] == GENERAL_INFO_GRAPH_NODE
         assert executions[0]["execution_number"] == 1
@@ -338,7 +342,11 @@ class TestExecutionsAPI:
 
         listed = api_client.get("/api/v1/instances", params={"rfqId": "RFQ-2026-0001"})
         assert listed.status_code == 200
-        rows = listed.json()
+        listed_body = listed.json()
+        assert listed_body["total"] == 1
+        assert listed_body["limit"] == 50
+        assert listed_body["offset"] == 0
+        rows = listed_body["items"]
         assert len(rows) == 1
         assert rows[0]["id"] == instance_id
         assert rows[0]["rfq_id"] == "RFQ-2026-0001"
@@ -355,7 +363,8 @@ class TestExecutionsAPI:
             params={"rfqId": "RFQ-2026-0001", "incompleteOnly": True},
         )
         assert incomplete_list.status_code == 200
-        assert len(incomplete_list.json()) == 1
+        assert incomplete_list.json()["total"] == 1
+        assert len(incomplete_list.json()["items"]) == 1
 
     def test_seed_from_previous_instance_static_defaults_only(self, api_client: TestClient):
         _seed_definitions(api_client)

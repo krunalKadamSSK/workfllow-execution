@@ -1,10 +1,10 @@
 from collections import deque
 
+from app.domain.ports.workflow_graph_document import WorkflowGraphDocument
 from app.domain.validation.issues import ValidationIssue
-from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
 
 
-def validate_graph_topology(workflow: WorkflowDefinitionIngest) -> list[ValidationIssue]:
+def validate_graph_topology(workflow: WorkflowGraphDocument) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     nodes_by_id = {node.id: node for node in workflow.nodes}
     node_ids = set(nodes_by_id)
@@ -150,7 +150,7 @@ def _find_cycle_nodes(adjacency: dict[str, list[str]]) -> set[str]:
 
 
 def validate_node_references(
-    workflow: WorkflowDefinitionIngest,
+    workflow: WorkflowGraphDocument,
     *,
     published_node_ids: set[str],
 ) -> list[ValidationIssue]:

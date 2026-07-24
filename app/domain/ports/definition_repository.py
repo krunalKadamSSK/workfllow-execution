@@ -1,0 +1,76 @@
+"""Port: node + workflow definition persistence (facade surface)."""
+
+from __future__ import annotations
+
+from typing import Any, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class DefinitionRepositoryPort(Protocol):
+    def create_node_definition(self, **kwargs: Any) -> Any: ...
+
+    def publish_node_version(self, **kwargs: Any) -> Any: ...
+
+    def get_node_definition(self, definition_id: str) -> Any | None: ...
+
+    def get_node_definition_by_slug(self, slug: str) -> Any | None: ...
+
+    def get_node_definition_version(
+        self, node_definition_id: str, version: int
+    ) -> Any | None: ...
+
+    def get_node_definition_version_by_id(self, version_id: str) -> Any | None: ...
+
+    def get_node_definition_versions_by_ids(self, version_ids: Any) -> dict[str, Any]: ...
+
+    def get_published_node_definitions_with_latest_versions(
+        self, definition_ids: Any
+    ) -> dict[str, Any]: ...
+
+    def pin_latest_node_versions(self, node_definition_ids: Any) -> dict[str, Any]: ...
+
+    def list_node_definitions(self) -> list[Any]: ...
+
+    def list_node_definitions_page(
+        self,
+        page: Any,
+        *,
+        status: str | None = None,
+        q: str | None = None,
+    ) -> Any: ...
+
+    def list_node_versions_page(self, node_definition_id: str, page: Any) -> Any: ...
+
+    def create_workflow_definition(self, **kwargs: Any) -> Any: ...
+
+    def publish_workflow_version(self, **kwargs: Any) -> Any: ...
+
+    def get_workflow_definition(self, definition_id: str) -> Any | None: ...
+
+    def get_workflow_definition_by_slug(self, slug: str) -> Any | None: ...
+
+    def get_workflow_definition_version(
+        self, workflow_definition_id: str, version: int
+    ) -> Any | None: ...
+
+    def get_workflow_definition_version_by_id(self, version_id: str) -> Any | None: ...
+
+    def get_workflow_definitions_by_ids(self, definition_ids: Any) -> dict[str, Any]: ...
+
+    def pin_workflow_version(
+        self, workflow_definition_id: str, version: int | None = None
+    ) -> Any: ...
+
+    def list_workflow_definitions(self) -> list[Any]: ...
+
+    def list_workflow_definitions_page(
+        self,
+        page: Any,
+        *,
+        status: str | None = None,
+        q: str | None = None,
+    ) -> Any: ...
+
+    def list_workflow_versions_page(
+        self, workflow_definition_id: str, page: Any
+    ) -> Any: ...

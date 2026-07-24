@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.infrastructure.db.models import NodeDefinition, NodeDefinitionVersion
-from app.infrastructure.db.models.instances import WorkflowNodeInstance
-from app.infrastructure.db.repositories.definitions import DefinitionRepository
+from app.domain.ports.definition_repository import DefinitionRepositoryPort as DefinitionRepository
+from app.infrastructure.persistence.models import NodeDefinition, NodeDefinitionVersion
+from app.infrastructure.persistence.models.instances import WorkflowNodeInstance
 
 
 @dataclass(frozen=True)

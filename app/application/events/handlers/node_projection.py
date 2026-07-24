@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.domain.events.stored_event import StoredEvent
 from app.domain.events.types import WorkflowEventType
-from app.infrastructure.db.repositories.projections import ProjectionRepository
+from app.domain.ports.projection_repository import ProjectionRepositoryPort as ProjectionRepository
 
 
 class WorkflowNodeProjectionHandler:

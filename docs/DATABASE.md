@@ -1,30 +1,33 @@
-# Database structure and relations
+# Database structure
 
 PostgreSQL schema for the workflow engine: **versioned definitions**, **runtime instances**, **append-only events**, and **read projections**.
 
-Models live under `app/infrastructure/db/models/`. Migrations are in `alembic/versions/`.
+- Models: `app/infrastructure/persistence/models/`
+- Migrations: `alembic/versions/`
+
+For local DB commands, see [Development setup](DEVELOPMENT.md).
+
+> **Viewing diagrams:** open Markdown **preview** (`Ctrl+Shift+V` / `Cmd+Shift+V`). Mermaid is not shown in the raw editor.
 
 ---
 
-## Entity relationship overview
+## Entity-relationship diagram
 
 ```mermaid
 erDiagram
-    base_types
+    node_definitions ||--o{ node_definition_versions : has_versions
+    workflow_definitions ||--o{ workflow_definition_versions : has_versions
+    workflow_definitions ||--o{ workflow_instances : started_from
+    workflow_definition_versions ||--o{ workflow_instances : pinned_version
 
-    node_definitions ||--o{ node_definition_versions : "has versions"
-    workflow_definitions ||--o{ workflow_definition_versions : "has versions"
-    workflow_definitions ||--o{ workflow_instances : "started from"
-    workflow_definition_versions ||--o{ workflow_instances : "pinned version"
+    workflow_instances ||--o| workflow_snapshots : graph_snapshot
+    workflow_instances ||--o| workflow_projections : read_model
+    workflow_instances ||--o{ workflow_events : event_log
+    workflow_instances ||--o{ workflow_node_instances : task_nodes
 
-    workflow_instances ||--o| workflow_snapshots : "graph snapshot"
-    workflow_instances ||--o| workflow_projections : "read model"
-    workflow_instances ||--o{ workflow_events : "event log"
-    workflow_instances ||--o{ workflow_node_instances : "task nodes"
-
-    node_definition_versions ||--o{ workflow_node_instances : "pinned node def"
-    workflow_node_instances ||--o{ workflow_node_executions : "attempts"
-    workflow_node_instances ||--o| workflow_node_projections : "node read model"
+    node_definition_versions ||--o{ workflow_node_instances : pinned_node_def
+    workflow_node_instances ||--o{ workflow_node_executions : attempts
+    workflow_node_instances ||--o| workflow_node_projections : node_read_model
 
     base_types {
         string id PK
@@ -65,7 +68,7 @@ erDiagram
         string id PK
         string workflow_definition_id FK
         string workflow_definition_version_id FK
-        enum status
+        string status
         int current_revision
     }
 
@@ -74,7 +77,7 @@ erDiagram
         string workflow_instance_id FK
         string workflow_node_id
         string node_definition_version_id FK
-        enum status
+        string status
     }
 
     workflow_events {
@@ -88,6 +91,48 @@ erDiagram
 ---
 
 ## Logical layers
+
+```mermaid
+flowchart TB
+    subgraph catalog["Catalog"]
+        BT[base_types]
+    end
+
+    subgraph definitions["Definitions — versioned blueprints"]
+        ND[node_definitions]
+        NDV[node_definition_versions]
+        WD[workflow_definitions]
+        WDV[workflow_definition_versions]
+        ND --> NDV
+        WD --> WDV
+    end
+
+    subgraph runtime["Runtime"]
+        WI[workflow_instances]
+        WNI[workflow_node_instances]
+        WNE[workflow_node_executions]
+        WS[workflow_snapshots]
+        WI --> WNI
+        WI --> WS
+        WNI --> WNE
+    end
+
+    subgraph events["Event store"]
+        WE[workflow_events]
+        WI --> WE
+    end
+
+    subgraph projections["Read models"]
+        WP[workflow_projections]
+        WNP[workflow_node_projections]
+        WI --> WP
+        WNI --> WNP
+    end
+
+    BT -.validates kind.-> NDV
+    WDV --> WI
+    NDV --> WNI
+```
 
 | Layer | Tables | Role |
 |-------|--------|------|
@@ -114,7 +159,7 @@ erDiagram
 | `enabled` | bool | Disabled kinds cannot be published |
 | `version` | string | Catalog row version |
 
-No FKs. Publish flow checks that a node’s `baseKind` exists and is enabled.
+No FKs. Publish checks that a node’s `baseKind` exists and is enabled.
 
 ---
 
@@ -144,7 +189,7 @@ No FKs. Publish flow checks that a node’s `baseKind` exists and is enabled.
 | `created_by` | string? | |
 | `created_at` | timestamptz | |
 
-**Relations:** N ← 1 `node_definitions`; referenced by `workflow_node_instances.node_definition_version_id` (no CASCADE — instances pin a version).
+**Relations:** referenced by `workflow_node_instances.node_definition_version_id` (no CASCADE — instances pin a version).
 
 #### `workflow_definitions`
 
@@ -162,7 +207,7 @@ Same shape as node definitions (`id`, `name`, `slug`, `status`, `latest_version`
 | `definition_json` | JSON | Graph: `nodes`, `edges`, description |
 | `created_by` / `created_at` | | |
 
-**Relations:** N ← 1 `workflow_definitions`; 1 → N `workflow_instances` (pinned version).
+**Relations:** 1 → N `workflow_instances` (pinned version).
 
 ---
 
@@ -177,7 +222,7 @@ Same shape as node definitions (`id`, `name`, `slug`, `status`, `latest_version`
 | `workflow_definition_id` | FK → `workflow_definitions` | Definition identity |
 | `workflow_definition_version_id` | FK → `workflow_definition_versions` | Pinned graph version |
 | `status` | enum `workflow_status` | `PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `CANCELLED` |
-| `current_revision` | int | Optimistic concurrency for status updates |
+| `current_revision` | int | Optimistic concurrency |
 | `created_by` / `created_at` / `completed_at` | | |
 
 **Relations:**
@@ -274,7 +319,7 @@ Same shape as node definitions (`id`, `name`, `slug`, `status`, `latest_version`
 |------|----|-------------|-----------|
 | `node_definitions` | `node_definition_versions` | 1:N | CASCADE |
 | `workflow_definitions` | `workflow_definition_versions` | 1:N | CASCADE |
-| `workflow_definitions` | `workflow_instances` | 1:N | restrict (no CASCADE) |
+| `workflow_definitions` | `workflow_instances` | 1:N | restrict |
 | `workflow_definition_versions` | `workflow_instances` | 1:N | restrict |
 | `node_definition_versions` | `workflow_node_instances` | 1:N | restrict |
 | `workflow_instances` | `workflow_snapshots` | 1:1 | CASCADE |
@@ -286,13 +331,68 @@ Same shape as node definitions (`id`, `name`, `slug`, `status`, `latest_version`
 
 Definition version FKs on instances are **restrict** so published blueprints are not deleted while runs still reference them. Runtime children of an instance **cascade** when the instance is removed.
 
+```mermaid
+flowchart LR
+    WI[workflow_instances] -->|CASCADE delete| WS[snapshots]
+    WI -->|CASCADE| WP[projections]
+    WI -->|CASCADE| WE[events]
+    WI -->|CASCADE| WNI[node_instances]
+    WNI -->|CASCADE| WNE[executions]
+    WNI -->|CASCADE| WNP[node_projections]
+
+    WDV[workflow_definition_versions] -.->|RESTRICT| WI
+    NDV[node_definition_versions] -.->|RESTRICT| WNI
+```
+
 ---
 
 ## Typical write flow
 
+```mermaid
+sequenceDiagram
+    participant Pub as Publish API
+    participant Def as definition tables
+    participant Start as Start instance
+    participant Run as runtime tables
+    participant Ev as workflow_events
+    participant Proj as projections
+    participant Sub as Submit or auto-run
+
+    Pub->>Def: parent and version row bump latest_version
+    Start->>Def: read pinned workflow and node versions
+    Start->>Run: instance node_instances snapshot
+    Start->>Ev: WORKFLOW_STARTED NODE_READY
+    Ev->>Proj: handlers update read models
+    Sub->>Run: node_executions and status
+    Sub->>Ev: NODE_STARTED NODE_COMPLETED
+    Ev->>Proj: refresh projections
+```
+
 1. Publish **node** / **workflow** definitions → parent row + version row (`latest_version` bumped).
-2. **Start instance** → `workflow_instances` row pins a workflow definition version; create `workflow_node_instances` for each task (each pins a `node_definition_version`); create snapshot + initial projection/events.
-3. **Submit node** → append `workflow_events`; insert/update `workflow_node_executions`; update node/instance status and projections.
+2. **Start instance** → pin a workflow definition version; create `workflow_node_instances` (each pins a `node_definition_version`); create snapshot + initial projection/events.
+3. **Submit node** (or auto-complete) → append `workflow_events`; insert `workflow_node_executions`; update statuses and projections.
+
+---
+
+## Events vs projections
+
+```mermaid
+flowchart TB
+    subgraph writePath [Write path]
+        CMD[Commands] --> EV[(workflow_events)]
+    end
+
+    subgraph readPath [Read path]
+        EV --> H[Event handlers]
+        H --> WP[(workflow_projections)]
+        H --> NP[(workflow_node_projections)]
+        API[GET instance] --> WP
+        API --> NP
+    end
+
+    RB[ProjectionRebuilder] -.->|replay| WP
+    RB -.-> NP
+```
 
 ---
 
@@ -304,16 +404,32 @@ Definition version FKs on instances are **restrict** so published blueprints are
 | `node_status` | `WAITING`, `PENDING`, `RUNNING`, `COMPLETED`, `INVALIDATED`, `FAILED` |
 | `execution_status` | `RUNNING`, `COMPLETED`, `FAILED` |
 
----
-
-## Ops cheat sheet
-
-```bash
-make up && make migrate    # start Postgres + apply migrations
-make db-psql               # psql shell
-make db-reset              # wipe volumes and re-migrate (destructive)
-make db-backup             # dump to backups/
-make db-restore file=...   # restore dump
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> RUNNING
+    RUNNING --> PAUSED
+    PAUSED --> RUNNING
+    RUNNING --> COMPLETED
+    RUNNING --> CANCELLED
+    PAUSED --> CANCELLED
 ```
 
-Source of truth for columns: `app/infrastructure/db/models/` and `alembic/versions/`.
+```mermaid
+stateDiagram-v2
+    [*] --> WAITING
+    WAITING --> PENDING
+    PENDING --> RUNNING
+    RUNNING --> COMPLETED
+    RUNNING --> FAILED
+    COMPLETED --> INVALIDATED
+    PENDING --> INVALIDATED
+    INVALIDATED --> PENDING
+```
+
+---
+
+## Related docs
+
+- [Architecture](ARCHITECTURE.md)
+- [Development setup](DEVELOPMENT.md)

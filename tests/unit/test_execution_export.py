@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from io import BytesIO
 
 from openpyxl import load_workbook
@@ -10,6 +10,8 @@ from app.application.executions.export import (
     safe_export_filename,
 )
 from app.domain.enums import ExecutionStatus, NodeStatus, WorkflowStatus
+
+UTC = timezone.utc  # noqa: UP017  # compatible with Python 3.10 local venvs
 
 
 class _Instance:

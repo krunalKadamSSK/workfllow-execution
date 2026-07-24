@@ -1,30 +1,40 @@
 from sqlalchemy.orm import Session
 
+from app.api.schemas.v1.definitions.nodes import NodeDefinitionIngest
+from app.api.schemas.v1.definitions.workflows import WorkflowDefinitionIngest
+from app.application.common.dto.pagination import Page, PageRequest
 from app.domain.definitions.output_fields import (
     collect_input_field_ids,
     collect_output_field_ids,
-    validate_declared_output,
 )
 from app.domain.exceptions import DuplicateSlugError, NotFoundError, ValidationError
-from app.domain.validation.form_blueprint import validate_form_blueprint
+from app.domain.ports.base_type_repository import BaseTypeRepositoryPort as BaseTypeRepository
+from app.domain.ports.definition_repository import DefinitionRepositoryPort as DefinitionRepository
 from app.domain.validation.pipeline import validate_workflow_definition
-from app.infrastructure.db.models import (
+from app.infrastructure.persistence.models import (
     NodeDefinition,
     NodeDefinitionVersion,
     WorkflowDefinition,
     WorkflowDefinitionVersion,
 )
-from app.infrastructure.db.models.base_types import BaseType
-from app.infrastructure.db.repositories.base_types import BaseTypeRepository
-from app.infrastructure.db.repositories.definitions import DefinitionRepository
-from app.modules.definitions.schemas.nodes import NodeDefinitionIngest
-from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
+from app.infrastructure.persistence.models.base_types import BaseType
+from app.patterns.executions.factories import NodeExecutorRegistry, get_default_registry
 
 
 class DefinitionIngestService:
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self,
+        session: Session,
+        *,
+        executors: NodeExecutorRegistry | None = None,
+    ) -> None:
+        self._session = session
         self._repo = DefinitionRepository(session)
         self._base_types = BaseTypeRepository(session)
+        self._executors = executors or get_default_registry()
+
+    def _commit(self) -> None:
+        self._session.commit()
 
     def publish_node(
         self,
@@ -34,34 +44,25 @@ class DefinitionIngestService:
     ) -> tuple[NodeDefinition, NodeDefinitionVersion]:
         self._base_types.require_enabled_kind(payload.baseKind)
 
-        if payload.baseKind == "userInput":
-            form_issues = validate_form_blueprint(
-                payload.form.model_dump() if payload.form is not None else None
+        stored = payload.to_stored_json()
+        issues = self._executors.for_definition(stored).validate_definition(stored)
+        if issues:
+            raise ValidationError(
+                "Node definition validation failed",
+                details=[issue.to_dict() for issue in issues],
             )
-            output_issues = validate_declared_output(payload.to_stored_json())
-            if form_issues or output_issues:
-                raise ValidationError(
-                    "Node form blueprint validation failed",
-                    details=[issue.to_dict() for issue in form_issues + output_issues],
-                )
-
-        if payload.baseKind == "table":
-            output_issues = validate_declared_output(payload.to_stored_json())
-            if output_issues:
-                raise ValidationError(
-                    "Table node definition validation failed",
-                    details=[issue.to_dict() for issue in output_issues],
-                )
 
         existing = self._repo.get_node_definition(payload.id)
         if existing is not None:
-            return self._publish_existing_node(existing, payload, created_by=created_by)
+            result = self._publish_existing_node(existing, payload, created_by=created_by)
+            self._commit()
+            return result
 
         slug_owner = self._repo.get_node_definition_by_slug(payload.slug)
         if slug_owner is not None:
             raise DuplicateSlugError(f"Node definition slug already exists: {payload.slug}")
 
-        return self._repo.create_node_definition(
+        result = self._repo.create_node_definition(
             definition_id=payload.id,
             name=payload.name,
             slug=payload.slug,
@@ -69,6 +70,8 @@ class DefinitionIngestService:
             definition_json=payload.to_stored_json(),
             created_by=created_by,
         )
+        self._commit()
+        return result
 
     def publish_workflow(
         self,
@@ -94,13 +97,15 @@ class DefinitionIngestService:
 
         existing = self._repo.get_workflow_definition(payload.id)
         if existing is not None:
-            return self._publish_existing_workflow(existing, payload, created_by=created_by)
+            result = self._publish_existing_workflow(existing, payload, created_by=created_by)
+            self._commit()
+            return result
 
         slug_owner = self._repo.get_workflow_definition_by_slug(slug)
         if slug_owner is not None:
             raise DuplicateSlugError(f"Workflow definition slug already exists: {slug}")
 
-        return self._repo.create_workflow_definition(
+        result = self._repo.create_workflow_definition(
             definition_id=payload.id,
             name=payload.name,
             slug=slug,
@@ -108,6 +113,8 @@ class DefinitionIngestService:
             definition_json=payload.to_stored_json(),
             created_by=created_by,
         )
+        self._commit()
+        return result
 
     def get_node_by_slug(
         self, slug: str, *, version: int | None = None
@@ -140,8 +147,42 @@ class DefinitionIngestService:
     def list_nodes(self) -> list[NodeDefinition]:
         return self._repo.list_node_definitions()
 
+    def list_nodes_page(
+        self,
+        page: PageRequest,
+        *,
+        status: str | None = None,
+        q: str | None = None,
+    ) -> Page[NodeDefinition]:
+        return self._repo.list_node_definitions_page(page, status=status, q=q)
+
+    def list_node_versions_page(
+        self, slug: str, page: PageRequest
+    ) -> Page[NodeDefinitionVersion]:
+        node = self._repo.get_node_definition_by_slug(slug)
+        if node is None:
+            raise NotFoundError(f"Node definition not found: {slug}")
+        return self._repo.list_node_versions_page(node.id, page)
+
     def list_workflows(self) -> list[WorkflowDefinition]:
         return self._repo.list_workflow_definitions()
+
+    def list_workflows_page(
+        self,
+        page: PageRequest,
+        *,
+        status: str | None = None,
+        q: str | None = None,
+    ) -> Page[WorkflowDefinition]:
+        return self._repo.list_workflow_definitions_page(page, status=status, q=q)
+
+    def list_workflow_versions_page(
+        self, slug: str, page: PageRequest
+    ) -> Page[WorkflowDefinitionVersion]:
+        workflow = self._repo.get_workflow_definition_by_slug(slug)
+        if workflow is None:
+            raise NotFoundError(f"Workflow definition not found: {slug}")
+        return self._repo.list_workflow_versions_page(workflow.id, page)
 
     def list_base_types(self, *, enabled_only: bool = True) -> list[BaseType]:
         return self._base_types.list_base_types(enabled_only=enabled_only)

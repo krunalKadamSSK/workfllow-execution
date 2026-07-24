@@ -1,9 +1,9 @@
+from app.domain.ports.workflow_graph_document import WorkflowGraphDocument
 from app.domain.validation.issues import ValidationIssue
-from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
 
 
 def validate_input_wiring(
-    workflow: WorkflowDefinitionIngest,
+    workflow: WorkflowGraphDocument,
     *,
     node_output_fields: dict[str, set[str]],
     node_input_fields: dict[str, set[str]],

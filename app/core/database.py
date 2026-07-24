@@ -1,41 +1,22 @@
+"""Compatibility shim — prefer ``app.infrastructure.persistence.session``."""
+
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
-# Import models so SQLAlchemy registers mappers and Alembic sees metadata.
-import app.infrastructure.db.models  # noqa: F401, E402
-from app.core.config import settings
-from app.infrastructure.db.base import Base
+from app.infrastructure.persistence.base import Base
+from app.infrastructure.persistence.session import get_session_manager
 
 __all__ = ["Base", "SessionLocal", "engine", "get_db", "check_database_connection"]
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-    connect_args={"connect_timeout": 5},
-)
-
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
-)
+_manager = get_session_manager()
+engine = _manager.engine
+SessionLocal = _manager.create_session
 
 
 def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+    yield from get_session_manager().provide_session()
 
 
 def check_database_connection() -> None:
-    with engine.connect() as connection:
-        connection.execute(text("SELECT 1"))
+    get_session_manager().check_connection()

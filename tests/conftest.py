@@ -3,11 +3,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
-import app.infrastructure.db.models  # noqa: F401
+import app.infrastructure.persistence.models  # noqa: F401
 from app.core.config import settings
-from app.infrastructure.db.base import Base
-from app.infrastructure.db.models.base_types import BaseType
-from app.infrastructure.db.seeds.base_types import BASE_TYPES_SEED
+from app.infrastructure.persistence.base import Base
+from app.infrastructure.persistence.models.base_types import BaseType
+from app.infrastructure.persistence.seeds.base_types import BASE_TYPES_SEED
 from app.main import app
 
 

@@ -40,6 +40,7 @@ ignore = [
 "alembic/versions/*.py" = ["E501", "UP007", "UP035", "W291"]
 "app/core/logging.py" = ["UP017"]
 "app/infrastructure/db/repositories/instances.py" = ["UP017"]
+"app/infrastructure/persistence/repositories/instances.py" = ["UP017"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

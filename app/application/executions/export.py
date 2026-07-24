@@ -11,8 +11,8 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from app.infrastructure.db.models.events import WorkflowEvent
-from app.infrastructure.db.models.instances import WorkflowInstance, WorkflowNodeExecution
+from app.infrastructure.persistence.models.events import WorkflowEvent
+from app.infrastructure.persistence.models.instances import WorkflowInstance, WorkflowNodeExecution
 
 ALL_EXPORT_FILENAME = "workflow-executions-export.xlsx"
 

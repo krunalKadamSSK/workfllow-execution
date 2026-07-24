@@ -24,7 +24,7 @@ def test_readiness_ok_when_dependencies_available(client):
         ],
     )
 
-    with patch("app.api.v1.health.run_readiness_checks", return_value=report):
+    with patch("app.api.routes.v1.health.run_readiness_checks", return_value=report):
         response = client.get("/ready")
 
     assert response.status_code == status.HTTP_200_OK
@@ -42,7 +42,7 @@ def test_readiness_returns_503_when_dependencies_unavailable(client):
         ],
     )
 
-    with patch("app.api.v1.health.run_readiness_checks", return_value=report):
+    with patch("app.api.routes.v1.health.run_readiness_checks", return_value=report):
         response = client.get("/ready")
 
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE

@@ -3,11 +3,12 @@ from pathlib import Path
 
 import pytest
 
+from app.api.schemas.v1.definitions.nodes import NodeDefinitionIngest
+from app.api.schemas.v1.definitions.workflows import WorkflowDefinitionIngest
 from app.application.definitions.ingest import DefinitionIngestService
 from app.application.executions.service import ExecutionService
 from app.domain.enums import NodeStatus, WorkflowStatus
-from app.modules.definitions.schemas.nodes import NodeDefinitionIngest
-from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
+from app.infrastructure.persistence.repositories.instances import InstanceRepository
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -165,7 +166,7 @@ class TestWorkflowOrchestrator:
 
         state = service.get_instance_state(instance.id)
         assert state["instance"].status == WorkflowStatus.COMPLETED
-        executions_before = service._orchestrator._instances.list_node_executions(instance.id)
+        executions_before = InstanceRepository(db_session).list_node_executions(instance.id)
         assert len(executions_before) == 2
 
         service.reopen_from_task(
@@ -184,7 +185,7 @@ class TestWorkflowOrchestrator:
         assert statuses[RAW_MATERIAL_GRAPH_NODE] == NodeStatus.INVALIDATED
         assert state["next_task_id"] == GENERAL_INFO_GRAPH_NODE
 
-        executions_after = service._orchestrator._instances.list_node_executions(instance.id)
+        executions_after = InstanceRepository(db_session).list_node_executions(instance.id)
         assert len(executions_after) == len(executions_before)
 
         event_types = [event.event_type for event in service.list_events(instance.id)]
@@ -227,7 +228,7 @@ class TestWorkflowOrchestrator:
         assert general_info.status == NodeStatus.COMPLETED
         assert general_info.current_execution == 2
 
-        executions = service._orchestrator._instances.list_node_executions(instance.id)
+        executions = InstanceRepository(db_session).list_node_executions(instance.id)
         general_executions = [
             execution
             for execution in executions

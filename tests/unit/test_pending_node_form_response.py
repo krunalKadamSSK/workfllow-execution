@@ -1,6 +1,6 @@
+from app.api.schemas.v1.instances import PendingNodeFormResponse
 from app.domain.executors.table_input import TableExecutor
 from app.domain.ports.executors import ExecutionContext
-from app.modules.executions.schemas import PendingNodeFormResponse
 
 
 def test_pending_node_form_response_preserves_table_payload():
@@ -48,7 +48,7 @@ def test_table_executor_prepare_pending_node_form_includes_columns():
             },
         },
         resolved_inputs={},
-        locked_input_keys=[],
+        locked_input_keys=frozenset(),
     )
 
     payload = executor.prepare_pending_node_form(context)

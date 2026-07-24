@@ -1,11 +1,11 @@
 import pytest
 
 from app.domain.exceptions import DuplicateSlugError, SequenceConflictError, VersionConflictError
-from app.infrastructure.db.models import NodeStatus, WorkflowStatus
-from app.infrastructure.db.repositories.definitions import DefinitionRepository
-from app.infrastructure.db.repositories.events import EventRepository
-from app.infrastructure.db.repositories.instances import InstanceRepository
-from app.infrastructure.db.repositories.unit_of_work import UnitOfWork
+from app.infrastructure.persistence.models import NodeStatus, WorkflowStatus
+from app.infrastructure.persistence.repositories.definitions import DefinitionRepository
+from app.infrastructure.persistence.repositories.events import EventRepository
+from app.infrastructure.persistence.repositories.instances import InstanceRepository
+from app.infrastructure.persistence.repositories.unit_of_work import UnitOfWork
 
 pytestmark = pytest.mark.integration
 

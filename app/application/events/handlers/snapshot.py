@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.domain.events.stored_event import StoredEvent
 from app.domain.events.types import WorkflowEventType
-from app.infrastructure.db.repositories.instances import InstanceRepository
+from app.domain.ports.instance_repository import InstanceRepositoryPort as InstanceRepository
 
 
 class WorkflowSnapshotHandler:

@@ -4,8 +4,8 @@ from app.application.events.handlers.node_projection import WorkflowNodeProjecti
 from app.application.events.handlers.snapshot import WorkflowSnapshotHandler
 from app.application.events.handlers.workflow_projection import WorkflowProjectionHandler
 from app.application.events.registry import EventHandlerRegistry
-from app.infrastructure.db.repositories.instances import InstanceRepository
-from app.infrastructure.db.repositories.projections import ProjectionRepository
+from app.domain.ports.instance_repository import InstanceRepositoryPort as InstanceRepository
+from app.domain.ports.projection_repository import ProjectionRepositoryPort as ProjectionRepository
 
 
 def create_default_event_handler_registry(

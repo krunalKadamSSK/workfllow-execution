@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
+from app.api.schemas.v1.definitions.workflows import WorkflowDefinitionIngest
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -77,15 +77,33 @@ class TestDefinitionsAPI:
 
         nodes_response = api_client.get("/api/v1/definitions/nodes")
         assert nodes_response.status_code == 200
-        node_slugs = {item["slug"] for item in nodes_response.json()}
+        nodes_body = nodes_response.json()
+        assert nodes_body["total"] == 2
+        node_slugs = {item["slug"] for item in nodes_body["items"]}
         assert node_slugs == {"general-information", "raw-material-pricing"}
 
         workflows_response = api_client.get("/api/v1/definitions/workflows")
         assert workflows_response.status_code == 200
-        workflows = workflows_response.json()
+        workflows_body = workflows_response.json()
+        assert workflows_body["total"] == 1
+        workflows = workflows_body["items"]
         assert len(workflows) == 1
         assert workflows[0]["slug"] == "test-workflow"
         assert "definition_json" not in workflows[0]
+
+        node_versions = api_client.get(
+            "/api/v1/definitions/nodes/general-information/versions"
+        )
+        assert node_versions.status_code == 200
+        assert node_versions.json()["total"] == 1
+        assert node_versions.json()["items"][0]["version"] == 1
+
+        workflow_versions = api_client.get(
+            "/api/v1/definitions/workflows/test-workflow/versions"
+        )
+        assert workflow_versions.status_code == 200
+        assert workflow_versions.json()["total"] == 1
+        assert workflow_versions.json()["items"][0]["version"] == 1
 
     def test_workflow_ingest_model_requires_slug(self):
         payload = _load("workflow_test.json")

@@ -1,5 +1,5 @@
-from sqlalchemy.orm import DeclarativeBase
+"""Shim — use ``app.infrastructure.persistence.base``."""
 
+from app.infrastructure.persistence.base import Base
 
-class Base(DeclarativeBase):
-    pass
+__all__ = ["Base"]
