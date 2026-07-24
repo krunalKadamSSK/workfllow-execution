@@ -29,5 +29,11 @@ setup_cors(app)
 register_exception_handlers(app)
 
 app.include_router(health_router)
+<<<<<<< HEAD
+=======
+# Root alias keeps `/backups` working; primary API is under `/api/v1`.
+app.include_router(backups_router)
+app.include_router(backups_router, prefix=settings.API_V1_PREFIX)
+>>>>>>> 9a5555d (Implement backup functionality with API integration)
 app.include_router(definitions_router, prefix=settings.API_V1_PREFIX)
 app.include_router(executions_router, prefix=settings.API_V1_PREFIX)

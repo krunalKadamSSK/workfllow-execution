@@ -1,5 +1,5 @@
 .env
-backups/
+/backups/
 .venv/
 venv/
 __pycache__/
