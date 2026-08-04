@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -45,7 +45,7 @@ class BackupRepository:
         return "postgresql"
 
     def timestamp(self) -> str:
-        return datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     def build_destination_path(self) -> tuple[str, Path]:
         backup_id = f"workflow_engine_{self.timestamp()}"
@@ -72,7 +72,7 @@ class BackupRepository:
             if not path.is_file() or path.suffix != BACKUP_EXTENSION:
                 continue
             stat = path.stat()
-            created = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
+            created = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
             backups.append(
                 BackupInfo(
                     id=path.stem,
@@ -96,7 +96,7 @@ class BackupRepository:
             id=backup_id,
             filename=path.name,
             size_bytes=stat.st_size,
-            created_at=datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
+            created_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
             database=self.database_name,
             engine=self.engine,
         )
