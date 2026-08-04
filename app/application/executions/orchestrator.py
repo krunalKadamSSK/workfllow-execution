@@ -185,6 +185,7 @@ class WorkflowOrchestrator:
         resolved_inputs = self._input_binder.resolve(
             workflow_instance_id=workflow_instance_id,
             graph_node=graph_node,
+            instance_metadata=instance.instance_metadata or {},
         )
         seed_memento = SeedDefaultsMemento.from_storage(instance.seed_defaults_json)
         executor = self._executors.get(definition_json["baseKind"])
@@ -386,6 +387,7 @@ class WorkflowOrchestrator:
             resolved_inputs = input_binder.resolve(
                 workflow_instance_id=workflow_instance_id,
                 graph_node=graph_node,
+                instance_metadata=instance.instance_metadata or {},
             )
             executor = self._executors.get(definition_json["baseKind"])
             context = ExecutionContext(

@@ -10,24 +10,41 @@ from app.domain.enums import NodeStatus
 NodeKind = Literal["start", "task", "end"]
 
 
+InputSourceKind = Literal["upstream", "metadata"]
+
+
 @dataclass(frozen=True)
 class GraphInputBinding:
     input_key: str
-    source_node_id: str
-    output_key: str
+    kind: InputSourceKind
+    source_node_id: str | None = None
+    output_key: str | None = None
+    metadata_key: str | None = None
     locked: bool = False
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> GraphInputBinding:
         source = data.get("source", {})
-        if source.get("kind") != "upstream":
-            raise ValueError(f"Unsupported input source kind: {source.get('kind')}")
-        return cls(
-            input_key=str(data["inputKey"]),
-            source_node_id=str(source["sourceNodeId"]),
-            output_key=str(source["outputKey"]),
-            locked=bool(data.get("locked", False)),
-        )
+        kind = source.get("kind")
+        locked = bool(data.get("locked", False))
+        input_key = str(data["inputKey"])
+
+        if kind == "upstream":
+            return cls(
+                input_key=input_key,
+                kind="upstream",
+                source_node_id=str(source["sourceNodeId"]),
+                output_key=str(source["outputKey"]),
+                locked=locked,
+            )
+        if kind == "metadata":
+            return cls(
+                input_key=input_key,
+                kind="metadata",
+                metadata_key=str(source["key"]),
+                locked=locked,
+            )
+        raise ValueError(f"Unsupported input source kind: {kind}")
 
 
 @dataclass(frozen=True)

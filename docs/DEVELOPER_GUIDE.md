@@ -439,6 +439,12 @@ A node is submittable only when `PENDING`. Submitting too early returns `409 UPS
 
 Task nodes can declare `inputs[].source.kind = "upstream"`. Values are read from completed upstream node projections and merged into the executor context. Locked inputs cannot be overridden by the user.
 
+### Metadata inputs
+
+Task nodes can also declare `inputs[].source.kind = "metadata"` with a `key` (e.g. `rfqId`). Values are read from `workflow_instances.instance_metadata` at prepare/submit time.
+
+Workflow definitions may include `metadataFields` — custom Select RFQ fields for that workflow. System keys (`rfqId`, `estimateRevision`, `estimatedBy`, `runName`) are always allowed for bindings; custom keys must be declared in `metadataFields`.
+
 ### Event log vs projections
 
 | Store | Role |
