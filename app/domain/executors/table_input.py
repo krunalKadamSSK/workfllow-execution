@@ -28,7 +28,8 @@ class TableExecutor(BaseNodeExecutor):
         table = definition.get("table") or {}
         columns = table.get("columns") or []
         header_fields = table.get("headerFields") or []
-        resolved = context.resolved_inputs
+        # Upstream locks win; static seed fills remaining defaults (re-estimate).
+        resolved = {**context.seed_defaults, **context.resolved_inputs}
 
         column_defaults: dict[str, Any] = {}
         for key, value in resolved.items():

@@ -77,6 +77,27 @@ class ProjectionRepository(BaseRepository):
             )
         )
 
+    def get_node_values_map_for_instance(
+        self, workflow_instance_id: str
+    ) -> dict[str, dict[str, Any]]:
+        """Return node projection values keyed by workflow graph node id."""
+        rows = self.session.execute(
+            select(
+                WorkflowNodeInstance.workflow_node_id,
+                WorkflowNodeProjection.current_values_json,
+            )
+            .join(
+                WorkflowNodeProjection,
+                WorkflowNodeProjection.workflow_node_instance_id == WorkflowNodeInstance.id,
+            )
+            .where(WorkflowNodeInstance.workflow_instance_id == workflow_instance_id)
+        )
+        return {
+            workflow_node_id: dict(values_json)
+            for workflow_node_id, values_json in rows
+            if isinstance(values_json, dict)
+        }
+
     def clear_node_projection(self, workflow_node_instance_id: str) -> None:
         existing = self.session.scalar(
             select(WorkflowNodeProjection).where(

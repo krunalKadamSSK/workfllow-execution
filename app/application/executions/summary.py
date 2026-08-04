@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.application.executions.definition_maps import NodeDefinitionMaps, load_node_definition_maps
 from app.application.executions.task_names import resolve_task_name
 from app.domain.definitions.output_fields import declared_output
 from app.domain.graph.workflow_graph import WorkflowGraph
@@ -14,12 +15,27 @@ def build_execution_summary(
     graph: WorkflowGraph,
     workflow_projection: dict[str, Any] | None,
     node_instances: list[WorkflowNodeInstance],
-    definition_repository: DefinitionRepository,
+    definition_repository: DefinitionRepository | None = None,
     task_names: dict[str, str] | None = None,
+    definition_maps: NodeDefinitionMaps | None = None,
 ) -> dict[str, Any]:
     """Build per-task cost line items and total from the workflow projection."""
     if workflow_projection is None:
         return {"items": [], "total": None}
+
+    maps = definition_maps
+    if maps is None:
+        if definition_repository is None:
+            raise ValueError("definition_repository or definition_maps is required")
+        maps = load_node_definition_maps(
+            definition_repository,
+            node_instances,
+            extra_definition_ids={
+                node.node_definition_id
+                for node in graph.task_nodes
+                if node.node_definition_id is not None
+            },
+        )
 
     nodes_state = workflow_projection.get("nodes", {})
     instances_by_graph_id = {node.workflow_node_id: node for node in node_instances}
@@ -34,9 +50,7 @@ def build_execution_summary(
         if node_instance is None:
             continue
 
-        version = definition_repository.get_node_definition_version_by_id(
-            node_instance.node_definition_version_id
-        )
+        version = maps.versions_by_id.get(node_instance.node_definition_version_id)
         if version is None:
             continue
 
@@ -48,7 +62,7 @@ def build_execution_summary(
         task_name = (task_names or {}).get(graph_node.id)
         if not task_name:
             node_definition = (
-                definition_repository.get_node_definition(graph_node.node_definition_id)
+                maps.definitions_by_id.get(graph_node.node_definition_id)
                 if graph_node.node_definition_id
                 else None
             )

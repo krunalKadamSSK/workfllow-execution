@@ -15,7 +15,8 @@ class WorkflowStateMachine:
             }
         ),
         WorkflowStatus.PAUSED: frozenset({WorkflowStatus.RUNNING, WorkflowStatus.CANCELLED}),
-        WorkflowStatus.COMPLETED: frozenset(),
+        # Allow reopen/invalidate after completion (re-run from an earlier task).
+        WorkflowStatus.COMPLETED: frozenset({WorkflowStatus.RUNNING}),
         WorkflowStatus.CANCELLED: frozenset(),
     }
 

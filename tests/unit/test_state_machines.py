@@ -24,9 +24,16 @@ class TestWorkflowStateMachine:
             WorkflowStatus.COMPLETED
         )
 
-    def test_completed_is_terminal(self):
-        assert self.sm.is_terminal(WorkflowStatus.COMPLETED)
-        assert not self.sm.can_transition(WorkflowStatus.COMPLETED, WorkflowStatus.RUNNING)
+    def test_completed_can_reopen_to_running(self):
+        assert self.sm.can_transition(WorkflowStatus.COMPLETED, WorkflowStatus.RUNNING)
+        assert self.sm.transition(WorkflowStatus.COMPLETED, WorkflowStatus.RUNNING) == (
+            WorkflowStatus.RUNNING
+        )
+        assert not self.sm.is_terminal(WorkflowStatus.COMPLETED)
+
+    def test_cancelled_is_terminal(self):
+        assert self.sm.is_terminal(WorkflowStatus.CANCELLED)
+        assert not self.sm.can_transition(WorkflowStatus.CANCELLED, WorkflowStatus.RUNNING)
 
     def test_illegal_transition_raises(self):
         with pytest.raises(InvalidTransitionError):

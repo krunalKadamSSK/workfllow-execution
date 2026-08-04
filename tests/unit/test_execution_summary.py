@@ -28,16 +28,20 @@ def test_build_execution_summary_uses_node_definition_name_when_json_has_no_name
         edges=(),
     )
     node_instance = _node_instance("task-1", "version-1")
-    definition_repository = MagicMock()
-    definition_repository.get_node_definition_version_by_id.return_value = MagicMock(
-        definition_json={
-            "baseKind": "userInput",
-            "output": {"id": "lineTotal", "label": "Line total"},
-        }
-    )
+    version = MagicMock()
+    version.node_definition_id = "def-1"
+    version.definition_json = {
+        "baseKind": "userInput",
+        "output": {"id": "lineTotal", "label": "Line total"},
+    }
     node_definition = MagicMock()
     node_definition.name = "Raw Material Price"
-    definition_repository.get_node_definition.return_value = node_definition
+
+    definition_repository = MagicMock()
+    definition_repository.get_node_definition_versions_by_ids.return_value = {
+        "version-1": version
+    }
+    definition_repository.get_node_definitions_by_ids.return_value = {"def-1": node_definition}
 
     summary = build_execution_summary(
         graph=graph,

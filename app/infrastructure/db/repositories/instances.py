@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.domain.enums import ExecutionStatus, NodeStatus, WorkflowStatus
 from app.domain.exceptions import NotFoundError, VersionConflictError
+from app.domain.metadata import InstanceMetadata
 from app.domain.state.node import NodeStateMachine
 from app.infrastructure.db.models import (
     WorkflowInstance,
@@ -13,6 +14,14 @@ from app.infrastructure.db.models import (
     WorkflowSnapshot,
 )
 from app.infrastructure.db.repositories.base import BaseRepository
+
+INCOMPLETE_WORKFLOW_STATUSES: frozenset[WorkflowStatus] = frozenset(
+    {
+        WorkflowStatus.PENDING,
+        WorkflowStatus.RUNNING,
+        WorkflowStatus.PAUSED,
+    }
+)
 
 
 class InstanceRepository(BaseRepository):
@@ -25,7 +34,15 @@ class InstanceRepository(BaseRepository):
         status: WorkflowStatus = WorkflowStatus.PENDING,
         created_by: str | None = None,
         instance_id: str | None = None,
+        metadata: InstanceMetadata | dict | None = None,
+        seed_defaults: dict | None = None,
     ) -> WorkflowInstance:
+        meta = (
+            metadata
+            if isinstance(metadata, InstanceMetadata)
+            else InstanceMetadata.from_storage(metadata)
+        )
+        storage = meta.to_storage()
         instance = WorkflowInstance(
             id=instance_id or str(uuid4()),
             name=name,
@@ -33,6 +50,9 @@ class InstanceRepository(BaseRepository):
             workflow_definition_version_id=workflow_definition_version_id,
             status=status,
             created_by=created_by,
+            instance_metadata=storage,
+            rfq_id=meta.rfq_id,
+            seed_defaults_json=dict(seed_defaults or {}),
         )
         self.session.add(instance)
         self.session.flush()
@@ -202,6 +222,31 @@ class InstanceRepository(BaseRepository):
                 select(WorkflowInstance).order_by(WorkflowInstance.created_at.desc())
             )
         )
+
+    def list_by_rfq_id(
+        self,
+        rfq_id: str,
+        *,
+        incomplete_only: bool = False,
+    ) -> list[WorkflowInstance]:
+        statement = select(WorkflowInstance).where(WorkflowInstance.rfq_id == rfq_id.strip())
+        if incomplete_only:
+            statement = statement.where(
+                WorkflowInstance.status.in_(tuple(INCOMPLETE_WORKFLOW_STATUSES))
+            )
+        statement = statement.order_by(WorkflowInstance.created_at.desc())
+        return list(self.session.scalars(statement))
+
+    def has_incomplete_for_rfq(self, rfq_id: str) -> bool:
+        statement = (
+            select(WorkflowInstance.id)
+            .where(
+                WorkflowInstance.rfq_id == rfq_id.strip(),
+                WorkflowInstance.status.in_(tuple(INCOMPLETE_WORKFLOW_STATUSES)),
+            )
+            .limit(1)
+        )
+        return self.session.scalar(statement) is not None
 
     def list_all_node_instances(self) -> list[WorkflowNodeInstance]:
         return list(self.session.scalars(select(WorkflowNodeInstance)))

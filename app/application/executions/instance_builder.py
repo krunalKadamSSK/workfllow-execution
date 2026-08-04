@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from app.domain.graph.workflow_graph import WorkflowGraph
+from app.domain.metadata import InstanceMetadata
 from app.infrastructure.db.models import (
     WorkflowDefinitionVersion,
     WorkflowInstance,
@@ -21,7 +23,10 @@ class BuiltWorkflowInstance:
 
 
 class WorkflowInstanceBuilder:
-    """Builder for workflow instances and pinned task node rows."""
+    """Builder for workflow instances and pinned task node rows.
+
+    Builder pattern — https://refactoring.guru/design-patterns/builder
+    """
 
     def __init__(
         self,
@@ -39,6 +44,8 @@ class WorkflowInstanceBuilder:
         workflow_definition_id: str,
         version: int | None = None,
         created_by: str | None = None,
+        metadata: InstanceMetadata | dict[str, Any] | None = None,
+        seed_defaults: dict[str, Any] | None = None,
     ) -> BuiltWorkflowInstance:
         workflow_version = self._definitions.pin_workflow_version(
             workflow_definition_id, version=version
@@ -50,12 +57,21 @@ class WorkflowInstanceBuilder:
             workflow_definition_id=workflow_definition_id,
             workflow_definition_version_id=workflow_version.id,
             created_by=created_by,
+            metadata=metadata,
+            seed_defaults=seed_defaults,
         )
 
         node_instances: dict[str, WorkflowNodeInstance] = {}
+        pinned_versions = self._definitions.pin_latest_node_versions(
+            [
+                task_node.node_definition_id
+                for task_node in graph.task_nodes
+                if task_node.node_definition_id is not None
+            ]
+        )
         for task_node in graph.task_nodes:
             assert task_node.node_definition_id is not None
-            node_version = self._definitions.pin_node_version(task_node.node_definition_id)
+            node_version = pinned_versions[task_node.node_definition_id]
             node_instance = self._instances.create_node_instance(
                 workflow_instance_id=instance.id,
                 workflow_node_id=task_node.id,

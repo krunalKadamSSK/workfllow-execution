@@ -28,6 +28,10 @@ class WorkflowInstance(Base):
     )
     current_revision: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Avoid attribute name `metadata` — conflicts with SQLAlchemy DeclarativeBase.metadata
+    instance_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    rfq_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    seed_defaults_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
