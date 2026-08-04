@@ -29,6 +29,11 @@ class WorkflowRevisionRequest(BaseModel):
     expected_revision: int | None = None
 
 
+class CancelWorkflowRequest(BaseModel):
+    expected_revision: int | None = None
+    reason: str | None = Field(default=None, min_length=1)
+
+
 class WorkflowNodeInstanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

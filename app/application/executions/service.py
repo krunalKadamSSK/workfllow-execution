@@ -117,10 +117,16 @@ class ExecutionService:
         )
 
     def cancel_workflow(
-        self, workflow_instance_id: str, *, expected_revision: int | None = None
+        self,
+        workflow_instance_id: str,
+        *,
+        expected_revision: int | None = None,
+        reason: str | None = None,
     ) -> WorkflowInstance:
         return self._orchestrator.cancel_workflow(
-            workflow_instance_id, expected_revision=expected_revision
+            workflow_instance_id,
+            expected_revision=expected_revision,
+            reason=reason,
         )
 
     def get_instance_state(

@@ -27,9 +27,13 @@ class WorkflowStatusChangedPayload:
     workflow_instance_id: str
     from_status: str
     to_status: str
+    reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
+        payload = dataclasses.asdict(self)
+        if payload["reason"] is None:
+            payload.pop("reason")
+        return payload
 
 
 @dataclasses.dataclass(frozen=True)
