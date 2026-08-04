@@ -30,7 +30,7 @@ class CommandRunner:
         )
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             process.kill()
             raise BackupServiceError("Backup command timed out", status_code=504) from exc
 
@@ -73,7 +73,7 @@ class CommandRunner:
             )
             try:
                 _, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-            except asyncio.TimeoutError as exc:
+            except TimeoutError as exc:
                 process.kill()
                 destination.unlink(missing_ok=True)
                 raise BackupServiceError("Backup command timed out", status_code=504) from exc
@@ -107,7 +107,7 @@ class CommandRunner:
                 stdout, stderr = await asyncio.wait_for(
                     process.communicate(), timeout=timeout
                 )
-            except asyncio.TimeoutError as exc:
+            except TimeoutError as exc:
                 process.kill()
                 raise BackupServiceError("Backup command timed out", status_code=504) from exc
 
