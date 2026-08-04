@@ -1,5 +1,27 @@
+from collections import defaultdict, deque
+
 from app.domain.validation.issues import ValidationIssue
 from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
+
+
+def _ancestors_by_node(workflow: WorkflowDefinitionIngest) -> dict[str, set[str]]:
+    """Map each node id to every ancestor reachable by walking edges backwards."""
+    incoming: dict[str, list[str]] = defaultdict(list)
+    for edge in workflow.edges:
+        incoming[edge.target].append(edge.source)
+
+    ancestors: dict[str, set[str]] = {}
+    for node in workflow.nodes:
+        seen: set[str] = set()
+        queue: deque[str] = deque(incoming.get(node.id, []))
+        while queue:
+            current = queue.popleft()
+            if current in seen:
+                continue
+            seen.add(current)
+            queue.extend(incoming.get(current, []))
+        ancestors[node.id] = seen
+    return ancestors
 
 
 def validate_input_wiring(
@@ -10,10 +32,13 @@ def validate_input_wiring(
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     nodes_by_id = {node.id: node for node in workflow.nodes}
+    ancestors_by_node = _ancestors_by_node(workflow)
 
     for node in workflow.task_nodes():
         if not node.inputs:
             continue
+
+        ancestors = ancestors_by_node.get(node.id, set())
 
         for node_input in node.inputs:
             source = node_input.source
@@ -62,6 +87,25 @@ def validate_input_wiring(
                             "workflow_node_id": node.id,
                             "source_node_id": source.sourceNodeId,
                             "source_kind": source_node.kind,
+                        },
+                    )
+                )
+                continue
+
+            if source.sourceNodeId not in ancestors:
+                issues.append(
+                    ValidationIssue(
+                        code="UPSTREAM_NOT_ANCESTOR",
+                        message=(
+                            f"Input '{node_input.inputKey}' on node '{node.id}' references "
+                            f"upstream '{source.sourceNodeId}' which is not on a path before "
+                            f"this task"
+                        ),
+                        field="nodes",
+                        details={
+                            "workflow_node_id": node.id,
+                            "input_key": node_input.inputKey,
+                            "source_node_id": source.sourceNodeId,
                         },
                     )
                 )
