@@ -130,6 +130,7 @@ class WorkflowOrchestrator:
         self._workflow_sm.transition(built.instance.status, WorkflowStatus.RUNNING)
         self._instances.update_workflow_status(built.instance, WorkflowStatus.RUNNING)
         self._advance(built.instance, built.graph)
+        self._sync_current_total_metadata(built.instance)
         return built.instance
 
     def list_instances_for_rfq(
@@ -242,6 +243,7 @@ class WorkflowOrchestrator:
             created_by=executed_by,
         )
 
+        self._sync_current_total_metadata(instance)
         self._advance(instance, graph)
         return node_instance
 
@@ -462,6 +464,19 @@ class WorkflowOrchestrator:
             self._instances.session.flush()
         return instance
 
+    def _sync_current_total_metadata(self, instance: WorkflowInstance) -> None:
+        """Mirror projection.total onto instance_metadata.currentTotal for bindings."""
+        state = self._projections.get_workflow_state(instance.id) or {}
+        total = state.get("total")
+        meta = dict(instance.instance_metadata or {})
+        if isinstance(total, int | float) and not isinstance(total, bool):
+            meta["currentTotal"] = float(total)
+        else:
+            meta["currentTotal"] = None
+        instance.instance_metadata = meta
+        flag_modified(instance, "instance_metadata")
+        self._instances.session.flush()
+
     def _advance(self, instance: WorkflowInstance, graph: WorkflowGraph) -> None:
         if instance.status != WorkflowStatus.RUNNING:
             return
@@ -575,6 +590,7 @@ class WorkflowOrchestrator:
             self._instances.increment_revision(instance)
 
         if affected:
+            self._sync_current_total_metadata(instance)
             self._advance(instance, graph)
 
         return affected

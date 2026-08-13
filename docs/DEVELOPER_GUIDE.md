@@ -443,7 +443,9 @@ Task nodes can declare `inputs[].source.kind = "upstream"`. Values are read from
 
 Task nodes can also declare `inputs[].source.kind = "metadata"` with a `key` (e.g. `rfqId`). Values are read from `workflow_instances.instance_metadata` at prepare/submit time.
 
-Workflow definitions may include `metadataFields` — custom Select RFQ fields for that workflow. System keys (`rfqId`, `estimateRevision`, `estimatedBy`, `runName`) are always allowed for bindings; custom keys must be declared in `metadataFields`.
+Workflow definitions may include `metadataFields` — custom Select RFQ fields for that workflow. System keys (`rfqId`, `estimateRevision`, `estimatedBy`, `runName`, `currentTotal`) are always allowed for bindings; custom keys must be declared in `metadataFields`.
+
+`currentTotal` is runtime-maintained: the orchestrator mirrors the workflow projection's running cost total onto `instance_metadata.currentTotal` after task completion and reopen/invalidate (null when there is no cost contribution yet). It is not collected on Select RFQ.
 
 ### Event log vs projections
 
