@@ -8,6 +8,7 @@ from app.api.deps import get_session
 from app.application.executions.service import ExecutionService
 from app.domain.enums import NodeStatus
 from app.modules.executions.schemas import (
+    CancelWorkflowRequest,
     CurrentTaskResponse,
     ExecutionSummary,
     InvalidateDownstreamRequest,
@@ -275,13 +276,14 @@ def resume_workflow(
 @router.post("/{instance_id}/cancel", response_model=WorkflowInstanceResponse)
 def cancel_workflow(
     instance_id: str,
-    payload: WorkflowRevisionRequest | None = None,
+    payload: CancelWorkflowRequest | None = None,
     service: ExecutionService = Depends(get_execution_service),
     session: Session = Depends(get_session),
 ) -> WorkflowInstanceResponse:
     service.cancel_workflow(
         instance_id,
         expected_revision=payload.expected_revision if payload else None,
+        reason=payload.reason if payload else None,
     )
     session.commit()
     return _instance_response(service.get_instance_state(instance_id))

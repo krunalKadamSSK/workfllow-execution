@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -18,12 +18,32 @@ class UpstreamSource(BaseModel):
     outputKey: str
 
 
+class MetadataSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["metadata"]
+    key: str
+
+
 class NodeInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     inputKey: str
-    source: UpstreamSource
+    source: Annotated[UpstreamSource | MetadataSource, Field(discriminator="kind")]
     locked: bool = False
+
+
+class WorkflowMetadataField(BaseModel):
+    """Custom Select RFQ / start-form field declared on a workflow definition."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    type: Literal["text", "number", "select", "boolean"] = "text"
+    required: bool = False
+    description: str | None = None
+    options: list[dict[str, Any]] | None = None
 
 
 class WorkflowNode(BaseModel):
@@ -62,6 +82,7 @@ class WorkflowDefinitionJson(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     description: str | None = None
+    metadataFields: list[WorkflowMetadataField] = Field(default_factory=list)
     nodes: list[WorkflowNode]
     edges: list[WorkflowEdge]
 
@@ -77,6 +98,7 @@ class WorkflowDefinitionIngest(BaseModel):
     status: str
     version: str | int
     description: str | None = None
+    metadataFields: list[WorkflowMetadataField] = Field(default_factory=list)
     nodes: list[WorkflowNode]
     edges: list[WorkflowEdge] = Field(default_factory=list)
 
@@ -95,9 +117,13 @@ class WorkflowDefinitionIngest(BaseModel):
     def to_stored_json(self) -> dict:
         return WorkflowDefinitionJson(
             description=self.description,
+            metadataFields=self.metadataFields,
             nodes=self.nodes,
             edges=self.edges,
         ).model_dump()
 
     def task_nodes(self) -> list[WorkflowNode]:
         return [node for node in self.nodes if node.kind == "task"]
+
+    def metadata_field_keys(self) -> set[str]:
+        return {field.key.strip() for field in self.metadataFields if field.key.strip()}

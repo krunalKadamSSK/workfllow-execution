@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.application.events.event_store import EventStore
 from app.application.executions.definition_maps import load_node_definition_maps
 from app.application.executions.input_binder import GraphInputBinder
@@ -185,6 +187,7 @@ class WorkflowOrchestrator:
         resolved_inputs = self._input_binder.resolve(
             workflow_instance_id=workflow_instance_id,
             graph_node=graph_node,
+            instance_metadata=instance.instance_metadata or {},
         )
         seed_memento = SeedDefaultsMemento.from_storage(instance.seed_defaults_json)
         executor = self._executors.get(definition_json["baseKind"])
@@ -265,13 +268,18 @@ class WorkflowOrchestrator:
         return instance
 
     def cancel_workflow(
-        self, workflow_instance_id: str, *, expected_revision: int | None = None
+        self,
+        workflow_instance_id: str,
+        *,
+        expected_revision: int | None = None,
+        reason: str | None = None,
     ) -> WorkflowInstance:
         return self._change_workflow_status(
             workflow_instance_id,
             target=WorkflowStatus.CANCELLED,
             event_type=WorkflowEventType.WORKFLOW_CANCELLED,
             expected_revision=expected_revision,
+            reason=reason,
         )
 
     def get_instance_state(
@@ -386,6 +394,7 @@ class WorkflowOrchestrator:
             resolved_inputs = input_binder.resolve(
                 workflow_instance_id=workflow_instance_id,
                 graph_node=graph_node,
+                instance_metadata=instance.instance_metadata or {},
             )
             executor = self._executors.get(definition_json["baseKind"])
             context = ExecutionContext(
@@ -423,6 +432,7 @@ class WorkflowOrchestrator:
         target: WorkflowStatus,
         event_type: WorkflowEventType,
         expected_revision: int | None,
+        reason: str | None = None,
     ) -> WorkflowInstance:
         instance = self._instances.require_workflow_instance(workflow_instance_id)
         previous = instance.status
@@ -430,6 +440,9 @@ class WorkflowOrchestrator:
         self._instances.update_workflow_status(
             instance, target, expected_revision=expected_revision
         )
+        cleaned_reason = reason.strip() if isinstance(reason, str) else None
+        if cleaned_reason == "":
+            cleaned_reason = None
         self._events.append(
             workflow_instance_id=workflow_instance_id,
             event_type=event_type.value,
@@ -437,8 +450,16 @@ class WorkflowOrchestrator:
                 workflow_instance_id=workflow_instance_id,
                 from_status=previous.value,
                 to_status=target.value,
+                reason=cleaned_reason,
             ).to_dict(),
         )
+        if target == WorkflowStatus.CANCELLED and cleaned_reason:
+            # Keep termination reason on the instance for easy client reads.
+            meta = dict(instance.instance_metadata or {})
+            meta["terminationReason"] = cleaned_reason
+            instance.instance_metadata = meta
+            flag_modified(instance, "instance_metadata")
+            self._instances.session.flush()
         return instance
 
     def _advance(self, instance: WorkflowInstance, graph: WorkflowGraph) -> None:

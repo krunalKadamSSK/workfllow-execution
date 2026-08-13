@@ -94,6 +94,61 @@ class TestInputWiringValidator:
         )
         assert any(issue.code == "UNKNOWN_OUTPUT_KEY" for issue in issues)
 
+    def test_upstream_not_ancestor_fails(
+        self,
+        test_workflow: WorkflowDefinitionIngest,
+        general_information_node: NodeDefinitionIngest,
+        raw_material_pricing_node: NodeDefinitionIngest,
+    ):
+        # Drop the edge between the two tasks so the binding is no longer ancestral.
+        test_workflow.edges = [
+            edge
+            for edge in test_workflow.edges
+            if not (
+                edge.source == "c24086be-e3d1-4953-8bbf-6b696b8fdd8e"
+                and edge.target == "7cf5eaa7-5a13-412b-8bb8-5f6cf386ad68"
+            )
+        ]
+        node_output_fields = {
+            general_information_node.id: general_information_node.output_field_ids(),
+            raw_material_pricing_node.id: raw_material_pricing_node.output_field_ids(),
+        }
+        node_input_fields = {
+            general_information_node.id: general_information_node.input_field_ids(),
+            raw_material_pricing_node.id: raw_material_pricing_node.input_field_ids(),
+        }
+        issues = validate_input_wiring(
+            test_workflow,
+            node_output_fields=node_output_fields,
+            node_input_fields=node_input_fields,
+        )
+        assert any(issue.code == "UPSTREAM_NOT_ANCESTOR" for issue in issues)
+
+    def test_unknown_upstream_node_fails(
+        self,
+        test_workflow: WorkflowDefinitionIngest,
+        general_information_node: NodeDefinitionIngest,
+        raw_material_pricing_node: NodeDefinitionIngest,
+    ):
+        pricing = next(
+            node for node in test_workflow.nodes if node.id == "7cf5eaa7-5a13-412b-8bb8-5f6cf386ad68"
+        )
+        assert pricing.inputs is not None
+        pricing.inputs[0].source.sourceNodeId = "missing-node"
+
+        issues = validate_input_wiring(
+            test_workflow,
+            node_output_fields={
+                general_information_node.id: general_information_node.output_field_ids(),
+                raw_material_pricing_node.id: raw_material_pricing_node.output_field_ids(),
+            },
+            node_input_fields={
+                general_information_node.id: general_information_node.input_field_ids(),
+                raw_material_pricing_node.id: raw_material_pricing_node.input_field_ids(),
+            },
+        )
+        assert any(issue.code == "INVALID_UPSTREAM_NODE" for issue in issues)
+
 
 class TestWorkflowValidationPipeline:
     def test_pipeline_passes_with_published_nodes(
