@@ -4,14 +4,16 @@ This document explains how the workflow execution engine is organized, how data 
 
 ## What this project does
 
-The engine runs **versioned workflows** defined as React Flow graphs. Each **task node** references a **node definition** (form schema, formulas, etc.). At runtime:
+The engine runs **versioned workflows** defined as React Flow graphs. Each **task node** references a **node definition** (form schema, table config, formulas, etc.). At runtime:
 
 1. Definitions are published and stored in PostgreSQL.
-2. A **workflow instance** is started; node definition versions are **pinned**.
+2. A **workflow instance** is started; workflow and node definition versions are **pinned**.
 3. Users submit task outputs via the API; the orchestrator runs executors **synchronously** in the request thread.
-4. State changes are recorded as an **append-only event log**; **projections** are updated for fast reads.
+4. State changes are recorded as an **append-only event log**; **projections** are updated in the same DB transaction for fast reads.
 
-Execution is **linear and synchronous** — there is no job queue or background worker.
+Execution is **synchronous** — there is no job queue or background worker. Long-running validation or large payloads block the HTTP response and hold a DB connection until `session.commit()`.
+
+**Supported node kinds (`baseKind`):** `userInput`, `table`
 
 ---
 
@@ -37,8 +39,12 @@ Key variables in `.env`:
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection (`postgresql+psycopg://...`) |
 | `REDIS_URL` | Used only for `GET /ready` health checks |
-| `EVENT_HASH_CHAIN` | Optional tamper-evident event chaining |
+| `EVENT_HASH_CHAIN` | Optional tamper-evident event chaining (`false` by default) |
 | `LOG_JSON` | Structured JSON logs when `true` |
+| `BACKUP_ENABLED` | Enable backup HTTP API and operations |
+| `BACKUP_ALLOW_RESTORE` | Allow restore endpoints (default `true`; set `false` in production unless intentional) |
+| `BACKUP_DEPLOYMENT_MODE` | `docker` (pg_dump via container) or `local` (host tools) |
+| `CORS_ORIGINS` | Allowed browser origins |
 
 ### 2. Start infrastructure
 
@@ -67,11 +73,23 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### 5. Run tests
 
 ```bash
-make check       # lint + unit tests (no Docker required for unit tests)
+make check       # lint + unit tests (no Postgres required)
 make test-all    # includes integration tests (requires Postgres)
 ```
 
 Integration tests auto-skip when PostgreSQL is unreachable.
+
+---
+
+## Security & production notes
+
+**There is no built-in authentication or authorization.** All API routes are open to any caller that can reach the service. For production:
+
+- Place the API behind an authenticated gateway, VPN, or mTLS.
+- Treat backup restore and bulk export as **admin-only** operations.
+- Set `BACKUP_ALLOW_RESTORE=false` unless restore is explicitly required.
+- Send `expected_revision` on mutating instance calls to avoid lost updates.
+- Do not run `pg_restore --clean` against a database while the app is serving writes.
 
 ---
 
@@ -96,13 +114,9 @@ All runtime data (definitions, instances, events, projections) lives in PostgreS
 DATABASE_URL=postgresql+psycopg://workflow:workflow@localhost:5432/workflow_engine
 ```
 
-**psql URL** (no driver suffix):
-
-```bash
-postgresql://workflow:workflow@localhost:5432/workflow_engine
-```
-
 The app accepts `postgresql://`, `postgres://`, or `postgresql+asyncpg://` and normalizes them to `postgresql+psycopg://` for sync SQLAlchemy.
+
+**Connection pool (defaults):** `pool_size=10`, `max_overflow=20`, `pool_pre_ping=True`, connect timeout 5s.
 
 ### Docker — start, stop, status
 
@@ -114,185 +128,112 @@ make logs            # tail all service logs
 make db-logs         # tail Postgres logs only
 ```
 
-Equivalent `docker-compose` commands:
-
-```bash
-docker-compose up -d
-docker-compose down
-docker-compose ps
-docker-compose logs -f postgres
-```
-
-### Port already in use
-
-Edit `.env` and change both the port mapping and connection URL:
-
-```bash
-POSTGRES_PORT=5433
-DATABASE_URL=postgresql+psycopg://workflow:workflow@localhost:5433/workflow_engine
-```
-
-Then restart:
-
-```bash
-make down && make up
-```
-
 ### Connect with psql
-
-Interactive shell inside the container:
 
 ```bash
 make db-psql
 ```
 
-Or from the host (if `psql` is installed):
-
-```bash
-psql postgresql://workflow:workflow@localhost:5432/workflow_engine
-```
-
-Useful `psql` commands once connected:
+Useful queries:
 
 ```sql
-\dt                          -- list tables
-\d workflow_events           -- describe a table
-\q                           -- quit
-
 SELECT id, event_type, sequence_number FROM workflow_events ORDER BY sequence_number LIMIT 10;
-SELECT id, name, status FROM workflow_instances;
+SELECT id, name, status, rfq_id, current_revision FROM workflow_instances;
 SELECT slug, latest_version FROM workflow_definitions;
 ```
 
 ### Migrations (Alembic)
 
-Apply all pending migrations:
-
 ```bash
-make migrate
-# equivalent: alembic upgrade head
+make migrate                              # alembic upgrade head
+make migration msg='add foo column'     # autogenerate
+make migrate-current
+make migrate-history
+make migrate-down                         # downgrade -1
 ```
 
-Create a new migration after changing SQLAlchemy models:
+Migration chain:
 
-```bash
-make migration msg='add foo column'
-# equivalent: alembic revision --autogenerate -m "add foo column"
-```
+| Revision | Summary |
+|----------|---------|
+| `4a780231d1ef` | Initial schema |
+| `002` | `base_types` catalog |
+| `003` | `table` base kind |
+| `004` | Base types seed sync |
+| `005` | `instance_metadata`, `rfq_id`, `seed_defaults_json` |
+| `006` | List/search indexes |
 
-Inspect migration state:
-
-```bash
-make migrate-current    # show current revision
-make migrate-history    # list all revisions
-alembic heads           # show head revision(s)
-```
-
-Roll back one revision:
-
-```bash
-make migrate-down
-# equivalent: alembic downgrade -1
-```
-
-Roll back everything:
-
-```bash
-alembic downgrade base
-```
-
-Mark DB as migrated without running scripts (use with care):
-
-```bash
-alembic stamp head
-```
-
-Initial schema: `alembic/versions/001_initial_workflow_schema.py`
-
-### Reset database (wipe all data)
-
-**Destructive** — drops volumes and recreates an empty database, then runs migrations:
+### Reset database (destructive)
 
 ```bash
 make db-reset
-```
-
-Manual equivalent:
-
-```bash
-docker-compose down -v          # remove postgres_data volume
-docker-compose up -d
-make db-wait                    # wait until pg_isready succeeds
-make migrate
 ```
 
 ### Verify connectivity
 
 ```bash
-make db-wait                     # exit 0 when Postgres accepts connections
-curl http://localhost:8000/ready # API readiness (Postgres + Redis)
-```
-
-One-liner from Python (uses `DATABASE_URL` from `.env`):
-
-```bash
+make db-wait
+curl http://localhost:8000/ready
 python -c "from app.core.database import check_database_connection; check_database_connection(); print('OK')"
 ```
 
-### Main tables
+### Backup and restore
 
-| Table | Purpose |
-|-------|---------|
-| `node_definitions` / `node_definition_versions` | Published node schemas |
-| `workflow_definitions` / `workflow_definition_versions` | Published workflow graphs |
-| `workflow_instances` / `workflow_node_instances` | Runtime instances |
-| `workflow_events` | Append-only event log (source of truth) |
-| `workflow_projections` / `workflow_node_projections` | Read models rebuilt from events |
-| `workflow_snapshots` | Pinned graph JSON at workflow start |
-
-### Backup and restore (optional)
-
-Dump:
+**Makefile:**
 
 ```bash
-docker exec workflow_engine_postgres pg_dump -U workflow -d workflow_engine -Fc -f /tmp/backup.dump
-docker cp workflow_engine_postgres:/tmp/backup.dump ./backup.dump
+make db-backup                    # backups/workflow_engine_YYYYMMDD_HHMMSS.dump
+make db-backup file=backups/my.dump
+make db-restore file=backups/my.dump
 ```
 
-Restore into a fresh database:
+**HTTP API** (`/api/v1/backups`, alias `/backups`):
 
 ```bash
-make db-reset
-docker cp ./backup.dump workflow_engine_postgres:/tmp/backup.dump
-docker exec workflow_engine_postgres pg_restore -U workflow -d workflow_engine --clean --if-exists /tmp/backup.dump
+curl http://localhost:8000/api/v1/backups
+curl -X POST http://localhost:8000/api/v1/backups
+curl -X POST http://localhost:8000/api/v1/backups/{backup_id}/restore
+curl -X DELETE http://localhost:8000/api/v1/backups/{backup_id}
 ```
+
+Implementation: `app/patterns/backups/` (Strategy + Repository). Docker mode streams `pg_dump`/`pg_restore` via container exec without writing to container `/tmp`.
+
+**Windows:** `db.bat backup` / `db.bat restore`
+
+See also [DATABASE.md](DATABASE.md) for schema-level write flows.
 
 ---
 
 ## Folder structure
 
 ```
-workflow_engine/
-├── app/                        # Application source
+workfllow-execution/
+├── app/
 │   ├── main.py                 # FastAPI app, middleware, router registration
-│   ├── api/                    # Cross-cutting HTTP concerns
-│   │   ├── deps.py             # FastAPI dependencies (DB session)
-│   │   ├── errors.py           # Domain exception → HTTP status mapping
-│   │   ├── schemas.py          # Shared API error response models
+│   ├── api/
+│   │   ├── deps.py             # DB session dependency
+│   │   ├── errors.py           # Domain exception → HTTP mapping
+│   │   ├── controllers/        # HTTP controllers (backups)
 │   │   └── v1/health.py        # /health, /ready
-│   ├── core/                   # Config, logging, CORS, middleware, DB session
-│   ├── modules/                # Feature routers + request/response DTOs
-│   │   ├── definitions/        # Publish & list workflow/node definitions
-│   │   └── executions/         # Start instances, submit nodes, pause/resume
-│   ├── application/            # Use cases (orchestration, ingest, events)
-│   ├── domain/                 # Pure business logic (no FastAPI/SQLAlchemy)
-│   └── infrastructure/         # SQLAlchemy models, repositories, Redis
-├── alembic/                    # Database migrations
-├── docs/                       # Architecture ADRs and this guide
+│   ├── core/                   # Config, logging, CORS, middleware, DB engine
+│   ├── modules/
+│   │   ├── definitions/        # Definition publish & list routes
+│   │   ├── executions/         # Instance lifecycle routes
+│   │   └── backups/            # Backup HTTP routes
+│   ├── application/
+│   │   ├── definitions/        # DefinitionIngestService
+│   │   ├── executions/         # Orchestrator, scheduler, export, seed memento
+│   │   ├── events/             # EventStore, handlers, ProjectionRebuilder
+│   │   └── backups/            # BackupService facade
+│   ├── domain/                 # Graph, executors, validation, state machines, ports
+│   ├── infrastructure/       # SQLAlchemy models, repositories, projection readers
+│   └── patterns/backups/       # Backup strategy, command runner, repository
+├── alembic/
+├── docs/
 ├── tests/
-│   ├── unit/                   # Domain & application logic (no I/O)
-│   ├── integration/            # DB + API tests (need Postgres)
-│   └── fixtures/               # Sample node/workflow JSON from the frontend
+│   ├── unit/
+│   ├── integration/
+│   └── fixtures/
 ├── docker-compose.yml
 ├── Makefile
 └── requirements.txt
@@ -302,7 +243,7 @@ workflow_engine/
 
 ## Layered architecture
 
-Dependencies point **inward**. Outer layers call inner layers; the domain never imports from API or infrastructure.
+Dependencies point **inward**. Outer layers call inner layers; the domain never imports FastAPI or SQLAlchemy.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -312,62 +253,59 @@ Dependencies point **inward**. Outer layers call inner layers; the domain never 
 ├─────────────────────────────────────────────────────────┤
 │  application/      Orchestrator, ingest, event store    │
 ├─────────────────────────────────────────────────────────┤
-│  domain/           Graph, state machines, executors,    │
-│                    validation, ports (protocols)        │
+│  domain/           Graph, state machines, executors     │
 ├─────────────────────────────────────────────────────────┤
-│  infrastructure/   SQLAlchemy models & repositories    │
+│  infrastructure/   SQLAlchemy models & repositories     │
 └─────────────────────────────────────────────────────────┘
 ```
 
-| Layer | Responsibility | Examples |
-|-------|----------------|----------|
-| **modules** | HTTP boundary — validate input, map responses | `definitions/router.py`, `executions/schemas.py` |
-| **application** | Coordinate use cases | `WorkflowOrchestrator`, `DefinitionIngestService`, `EventStore` |
-| **domain** | Rules and algorithms with no I/O | `WorkflowGraph`, `UserInputExecutor`, `WorkflowStateMachine` |
-| **infrastructure** | Persistence and external systems | `DefinitionRepository`, SQLAlchemy models |
-
-See also [ADR-001](adr/001-architecture-and-standards.md) for SOLID mapping and design patterns.
+See [ADR-001](adr/001-architecture-and-standards.md) for SOLID mapping and design patterns.
 
 ---
 
 ## Code structure by concern
 
-### Definitions (`app/modules/definitions` + `app/application/definitions`)
+### Definitions
 
 - **Ingest** — `DefinitionIngestService` validates workflow graphs and stores versioned definitions.
-- **Validation** — `app/domain/validation/` checks topology, node references, and upstream input wiring.
-- **Schemas** — `modules/definitions/schemas/` mirrors the React Flow JSON shape.
+- **Validation** — topology, node references, upstream/metadata input wiring (`app/domain/validation/`).
+- **Publish** — re-publish by id creates a new version row and bumps `latest_version`.
 
-### Executions (`app/modules/executions` + `app/application/executions`)
+### Executions
 
-- **Facade** — `ExecutionService.from_session(session)` wires repositories, event store, and orchestrator.
-- **Orchestrator** — `WorkflowOrchestrator` is the mediator: start, submit, pause, resume, cancel, advance.
-- **Scheduler** — `GraphScheduler` finds ready task nodes from graph topology + node statuses.
-- **Input binding** — `GraphInputBinder` + `UpstreamInputResolver` fill locked upstream fields from projections.
+- **Facade** — `ExecutionService.from_session(session)` wires repositories, event store, orchestrator.
+- **Orchestrator** — `WorkflowOrchestrator`: start, submit, pause, resume, cancel, reopen, advance, export.
+- **Scheduler** — `GraphScheduler`: ready tasks, downstream invalidation, next pending task.
+- **Input binding** — `GraphInputBinder` + `UpstreamInputResolver` (upstream outputs + instance metadata).
+- **Seed memento** — `seed_from_instance_id` copies static field defaults from a prior instance (same workflow definition).
+- **Export** — Excel export per instance or all instances (`openpyxl`).
 
-### Event sourcing (`app/application/events` + `app/domain/events`)
+### Event sourcing
 
-- **EventStore.append()** — writes `WorkflowEvent` rows and dispatches handlers.
-- **Handlers** — update `WorkflowProjection`, `WorkflowNodeProjection`, and snapshots.
-- **Rebuilder** — `ProjectionRebuilder` replays the log to rebuild projections from scratch.
+- **EventStore.append()** — assigns sequence number, optional hash chain, persists event, dispatches handlers.
+- **Handlers** — workflow projection, node projection, workflow snapshot on start.
+- **ProjectionRebuilder** — deletes projections and replays events (available in tests / `UnitOfWork`; no public API yet).
 
-### Node executors (`app/domain/executors`)
+### Node executors
 
-- **Registry** — `create_default_registry()` maps `baseKind` → executor (currently `userInput` only).
-- **Template method** — `BaseNodeExecutor`: resolve upstream defaults → validate fields → persist submitted outputs (formulas run in React)
-- **Ports** — `app/domain/ports/executors.py` defines `NodeExecutor`, `ExecutionContext`.
+| `baseKind` | Class | Notes |
+|------------|-------|-------|
+| `userInput` | `UserInputExecutor` | Synapse form fields; locked upstream validation |
+| `table` | `TableExecutor` | Header fields + rows; server-side aggregations |
 
-### Persistence (`app/infrastructure/db`)
+Registry: `create_default_registry()` in `app/domain/executors/registry.py`.
 
-- **Models** — `definitions`, `instances`, `events`, `projections` tables.
-- **Repositories** — one per aggregate; no business logic inside repositories.
-- **UnitOfWork** — optional transaction boundary for multi-repo operations.
+Lifecycle (`BaseNodeExecutor`): `prepare` → merge outputs → `validate_outputs` → `complete`.
+
+### Transactions
+
+Mutating routes call service methods then **`session.commit()`** explicitly. The `get_db()` dependency rolls back on exception but does **not** auto-commit. Read routes leave the session open until the request ends (implicit read transaction).
 
 ---
 
 ## Runtime flow (demo workflow)
 
-The fixtures in `tests/fixtures/` model a simple pipeline:
+Fixtures in `tests/fixtures/` — linear pipeline:
 
 ```
 start → General Information → Raw Material Pricing → end
@@ -394,29 +332,74 @@ curl -X POST http://localhost:8000/api/v1/definitions/workflows \
 ```bash
 curl -X POST http://localhost:8000/api/v1/instances \
   -H 'Content-Type: application/json' \
-  -d '{"name": "Demo run", "workflow_definition_id": "1091df5d-58d8-4233-abd5-0a85ec476470"}'
+  -d '{
+    "name": "Demo run",
+    "workflow_definition_id": "1091df5d-58d8-4233-abd5-0a85ec476470",
+    "metadata": {"rfqId": "RFQ-2026-0001", "estimateRevision": "1"}
+  }'
 ```
 
-Response includes `pending_node_ids` — graph node IDs ready for submit.
+Optional fields on start:
+
+| Field | Purpose |
+|-------|---------|
+| `version` | Pin specific workflow definition version (default: latest) |
+| `metadata` | Stored in `instance_metadata` / indexed `rfq_id` |
+| `seed_from_instance_id` | Copy static defaults from prior instance (same workflow definition) |
+| `created_by` | Audit string (client-supplied; not authenticated) |
+
+Response includes `pending_node_ids`, `pending_node_forms`, `next_task_id`, `execution_summary`, `total_cost`.
 
 ### Step 3 — Submit task outputs
 
-Use the graph node id (e.g. `c24086be-e3d1-4953-8bbf-6b696b8fdd8e`), **not** the node definition UUID:
+Use the **graph node id** (e.g. `c24086be-e3d1-4953-8bbf-6b696b8fdd8e`), not the node definition UUID:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/instances/{instance_id}/nodes/{workflow_node_id}/submit \
   -H 'Content-Type: application/json' \
-  -d '{"outputs": {"customerName": "ACME", "partName": "PART-1", "castingProcess": "GDC", "volume": 10}}'
+  -d '{
+    "outputs": {"customerName": "ACME", "partName": "PART-1", "castingProcess": "GDC", "volume": 10},
+    "expected_revision": 1
+  }'
 ```
 
-Submit the second task when it appears in `pending_node_ids`. When all tasks complete, status becomes `COMPLETED`.
+Submit when the node is `PENDING`. Early submit returns `409 UPSTREAM_NOT_READY`.
 
-### Step 4 — Inspect state and events
+When all tasks complete, status becomes `COMPLETED` and `total_cost` reflects summed cost contributions.
+
+### Step 4 — Inspect state
 
 ```bash
 curl http://localhost:8000/api/v1/instances/{instance_id}
 curl http://localhost:8000/api/v1/instances/{instance_id}/events
+curl http://localhost:8000/api/v1/instances/{instance_id}/node-executions
+curl http://localhost:8000/api/v1/instances/{instance_id}/export   # Excel download
 ```
+
+### RFQ revisions
+
+```bash
+# List all instances for an RFQ
+curl 'http://localhost:8000/api/v1/instances?rfqId=RFQ-2026-0001'
+
+# Incomplete only
+curl 'http://localhost:8000/api/v1/instances?rfqId=RFQ-2026-0001&incompleteOnly=true'
+
+# Check if any incomplete revision exists
+curl http://localhost:8000/api/v1/instances/rfq/RFQ-2026-0001/incomplete
+```
+
+### Reopen / invalidate (correction flow)
+
+```bash
+curl -X POST http://localhost:8000/api/v1/instances/{instance_id}/nodes/{workflow_node_id}/invalidate \
+  -H 'Content-Type: application/json' \
+  -d '{"reason": "correction", "expected_revision": 3, "reopen_target": true}'
+```
+
+- Reopens target task (if completed) and invalidates downstream tasks.
+- Completed workflows transition back to `RUNNING`.
+- Downstream projections cleared; `currentTotal` recalculated.
 
 ---
 
@@ -426,66 +409,107 @@ curl http://localhost:8000/api/v1/instances/{instance_id}/events
 
 | ID type | Example | Used for |
 |---------|---------|----------|
-| **Graph node id** | `c24086be-e3d1-4953-8bbf-6b696b8fdd8e` | API submit path, edges, upstream wiring |
-| **Node definition id** | `4eb5cfe4-8eff-463a-a315-a39f31a26756` | Published form schema, pinned at instance creation |
+| **Graph node id** | `c24086be-e3d1-4953-8bbf-6b696b8fdd8e` | Submit path, edges, upstream wiring |
+| **Node definition id** | `4eb5cfe4-8eff-463a-a315-a39f31a26756` | Published schema, pinned at instance creation |
 
 ### Node statuses
 
-`WAITING` → `PENDING` (ready for user) → `RUNNING` → `COMPLETED`
+```
+WAITING → PENDING → RUNNING → COMPLETED
+                ↘ INVALIDATED ↗
+                ↘ FAILED (supported; not emitted by orchestrator today)
+```
 
-A node is submittable only when `PENDING`. Submitting too early returns `409 UPSTREAM_NOT_READY`.
+Submit is allowed only when `PENDING`.
+
+### Workflow graph topology
+
+Graphs must be **DAGs** (one start, ≥1 end, no cycles). **Parallel branches** (fork/join) are valid — see `tests/unit/test_workflow_graph.py`.
+
+> **Concurrency note:** If two parallel terminal tasks are submitted at exactly the same time, completion detection can race: both transactions may fail to emit `WORKFLOW_COMPLETED`, leaving the workflow in `RUNNING` with all tasks `COMPLETED`. Calling `POST .../resume` triggers `_advance()` and can recover. Prefer serializing terminal submits or fixing with row-level locking before production use with parallel graphs.
 
 ### Upstream inputs
 
-Task nodes can declare `inputs[].source.kind = "upstream"`. Values are read from completed upstream node projections and merged into the executor context. Locked inputs cannot be overridden by the user.
+`inputs[].source.kind = "upstream"` — values from completed upstream **node projections**. Locked inputs cannot be overridden.
 
 ### Metadata inputs
 
-Task nodes can also declare `inputs[].source.kind = "metadata"` with a `key` (e.g. `rfqId`). Values are read from `workflow_instances.instance_metadata` at prepare/submit time.
+`inputs[].source.kind = "metadata"` — values from `instance_metadata`.
 
-Workflow definitions may include `metadataFields` — custom Select RFQ fields for that workflow. System keys (`rfqId`, `estimateRevision`, `estimatedBy`, `runName`, `currentTotal`) are always allowed for bindings; custom keys must be declared in `metadataFields`.
+System keys: `rfqId`, `estimateRevision`, `estimatedBy`, `runName`, `currentTotal`. Custom keys must appear in workflow `metadataFields`.
 
-`currentTotal` is runtime-maintained: the orchestrator mirrors the workflow projection's running cost total onto `instance_metadata.currentTotal` after task completion and reopen/invalidate (null when there is no cost contribution yet). It is not collected on Select RFQ.
+`currentTotal` is mirrored from the workflow projection total after completions and invalidations (used for metadata bindings).
 
 ### Event log vs projections
 
 | Store | Role |
 |-------|------|
 | `workflow_events` | Source of truth — append-only audit trail |
-| `workflow_projections` / `workflow_node_projections` | Read models rebuilt from events |
+| `workflow_projections` / `workflow_node_projections` | Read models updated synchronously from events |
+
+Under concurrent writes to the same workflow, the aggregate workflow projection JSON can suffer lost updates; node-level projection rows are per-node. `ProjectionRebuilder` can replay events to rebuild (operational tooling only today).
+
+### Optimistic concurrency
+
+`workflow_instances.current_revision` increments on status changes (and some invalidations). Pass `expected_revision` on submit, pause, resume, cancel, and reopen to get `409 VERSION_CONFLICT` on stale clients. **The field is optional** — omitting it disables conflict detection.
 
 ---
 
-## API reference (summary)
+## API reference
 
-Base path: `/api/v1`
+Base path: `/api/v1` unless noted.
+
+### Health
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Liveness |
+| `GET` | `/ready` | Postgres + Redis checks |
 
 ### Definitions
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/definitions/nodes` | Publish node definition |
+| `GET` | `/definitions/base-types` | List enabled base kinds |
+| `POST` | `/definitions/nodes` | Publish node definition (new or new version) |
 | `GET` | `/definitions/nodes` | List node summaries |
-| `GET` | `/definitions/nodes/{slug}` | Get node (+ version) |
+| `GET` | `/definitions/nodes/{slug}` | Get node (+ latest or `?version=`) |
+| `GET` | `/definitions/nodes/{slug}/versions/{version}` | Get specific node version |
 | `POST` | `/definitions/workflows` | Publish workflow |
 | `GET` | `/definitions/workflows` | List workflow summaries |
-| `GET` | `/definitions/workflows/{slug}` | Get workflow (+ version) |
+| `GET` | `/definitions/workflows/{slug}` | Get workflow (+ latest or `?version=`) |
+| `GET` | `/definitions/workflows/{slug}/versions/{version}` | Get specific workflow version |
 
 ### Instances
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/instances` | Start workflow instance |
-| `GET` | `/instances/{id}` | Instance + nodes + projection |
+| `GET` | `/instances?rfqId=…&incompleteOnly=false` | List instances by RFQ |
+| `GET` | `/instances/rfq/{rfq_id}/incomplete` | Boolean incomplete check |
+| `GET` | `/instances/export` | Excel export of **all** instances |
+| `GET` | `/instances/{id}` | Full instance state + forms + summary |
+| `GET` | `/instances/{id}/export` | Excel export of one instance |
 | `POST` | `/instances/{id}/nodes/{workflow_node_id}/submit` | Submit task outputs |
-| `POST` | `/instances/{id}/pause` | Pause workflow |
-| `POST` | `/instances/{id}/resume` | Resume workflow |
-| `POST` | `/instances/{id}/cancel` | Cancel workflow |
+| `POST` | `/instances/{id}/nodes/{workflow_node_id}/invalidate` | Reopen task + invalidate downstream |
+| `POST` | `/instances/{id}/pause` | Pause (`expected_revision` optional body) |
+| `POST` | `/instances/{id}/resume` | Resume + advance |
+| `POST` | `/instances/{id}/cancel` | Cancel (optional `reason`) |
 | `GET` | `/instances/{id}/events` | Event audit trail |
+| `GET` | `/instances/{id}/node-executions` | Execution history rows |
+
+### Backups
+
+Also mounted at `/backups` (root alias).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/backups?limit=&offset=` | Paginated backup list |
+| `POST` | `/backups` | Create backup |
+| `POST` | `/backups/{backup_id}/restore` | Restore (requires `BACKUP_ALLOW_RESTORE`) |
+| `DELETE` | `/backups/{backup_id}` | Delete backup file |
 
 ### Error responses
-
-All errors share this shape:
 
 ```json
 {
@@ -498,6 +522,19 @@ All errors share this shape:
 }
 ```
 
+| Code | HTTP | When |
+|------|------|------|
+| `NOT_FOUND` | 404 | Missing resource |
+| `VALIDATION_ERROR` | 422 | Definition / request validation |
+| `FIELD_VALIDATION_FAILED` | 400 | Runtime form/table validation |
+| `INVALID_TRANSITION` | 409 | Illegal status change |
+| `UPSTREAM_NOT_READY` | 409 | Node not `PENDING` / upstream incomplete |
+| `VERSION_CONFLICT` | 409 | Stale `expected_revision` |
+| `SEQUENCE_CONFLICT` | 409 | Event sequence contention (after retries) |
+| `INPUT_RESOLUTION_ERROR` | 409 | Missing upstream output or metadata key |
+| `NODE_EXECUTION_ERROR` | 400 | Executor / graph errors |
+| `DUPLICATE_SLUG` | 409 | Definition slug collision |
+
 ---
 
 ## Where to change what
@@ -507,11 +544,12 @@ All errors share this shape:
 | Add API endpoint | `app/modules/<feature>/router.py` |
 | Add request/response DTO | `app/modules/<feature>/schemas.py` |
 | Change orchestration logic | `app/application/executions/orchestrator.py` |
-| Add node type (`baseKind`) | `app/domain/executors/` + register in `registry.py` |
+| Add node type (`baseKind`) | `app/domain/executors/` + `registry.py` + base_types seed/migration |
 | Add validation rule | `app/domain/validation/` |
 | Add event type / handler | `app/domain/events/` + `app/application/events/handlers/` |
-| Change DB schema | SQLAlchemy model → `alembic revision` → `make migrate` |
+| Change DB schema | SQLAlchemy model → `make migration msg='…'` → `make migrate` |
 | Map new domain error to HTTP | `app/api/errors.py` |
+| Backup deployment mode | `app/patterns/backups/strategies.py`, `factory.py` |
 
 ---
 
@@ -519,11 +557,15 @@ All errors share this shape:
 
 | Directory | Scope | Requires Postgres |
 |-----------|-------|-------------------|
-| `tests/unit/` | Pure domain/application logic | No |
-| `tests/integration/` | Repositories, orchestrator, API | Yes |
-| `tests/fixtures/` | Realistic JSON from the frontend | — |
+| `tests/unit/` | Domain, executors, validation, export | No |
+| `tests/integration/` | Repositories, orchestrator, API, event store | Yes |
+| `tests/fixtures/` | Sample node/workflow JSON | — |
 
-Mark integration tests with `@pytest.mark.integration`. Use the `api_client` fixture in `tests/conftest.py` for HTTP tests with a rolled-back DB transaction.
+- Mark integration tests: `@pytest.mark.integration`
+- `make test` excludes integration; `make test-all` runs everything
+- `api_client` fixture overrides DB session with rolled-back transaction per test
+
+**Notable gaps in test coverage today:** concurrent parallel terminal submits, auth boundaries, bulk export at scale.
 
 ---
 
@@ -534,45 +576,54 @@ make install      # pip install dependencies
 make lint         # ruff check
 make format       # ruff format
 make test         # unit tests only
-make test-all     # all tests (requires Postgres)
+make test-all     # all tests
 make check        # lint + unit tests
-make pre-commit   # run git hooks
+make pre-commit   # git hooks
 ```
 
 ### PostgreSQL shortcuts
 
 ```bash
-make up               # start Postgres + Redis
-make migrate          # alembic upgrade head
-make migration msg='describe change'   # autogenerate migration
-make migrate-current  # show current revision
-make migrate-history  # list revisions
-make migrate-down     # rollback one revision
-make db-psql          # open psql shell
-make db-logs          # tail Postgres logs
-make db-wait          # wait until Postgres is ready
-make db-reset         # wipe volumes + migrate (destructive)
+make up
+make migrate
+make migration msg='describe change'
+make migrate-current
+make migrate-history
+make migrate-down
+make db-psql
+make db-logs
+make db-wait
+make db-reset
+make db-backup
+make db-restore file=backups/your.dump
 ```
-
-See [PostgreSQL](#postgresql) above for full details (connection URLs, backup, table reference).
 
 ---
 
 ## Extending the engine
 
-To add a new node type (e.g. `apiCall`):
+### New node type
 
-1. Implement `NodeExecutor` in `app/domain/executors/`.
-2. Register it in `create_default_registry()` (`app/domain/executors/registry.py`).
-3. Add Pydantic schema validation for the definition JSON if needed.
-4. Add unit tests for the executor; integration test through the orchestrator.
+1. Implement executor in `app/domain/executors/` (subclass `BaseNodeExecutor` or implement `NodeExecutor`).
+2. Register in `create_default_registry()`.
+3. Add / enable row in `base_types` (migration if new kind).
+4. Add definition schema validation if needed.
+5. Unit tests for executor; integration test via orchestrator.
 
-The orchestrator and API do not need changes if the executor honors the existing `ExecutionContext` contract.
+The orchestrator and submit API unchanged if the executor honors `ExecutionContext`.
+
+### New event type
+
+1. Add to `WorkflowEventType` enum.
+2. Add payload dataclass in `domain/events/payloads.py`.
+3. Extend `apply_workflow_projection_event` and/or add handler.
+4. Emit from orchestrator at the correct lifecycle point.
 
 ---
 
 ## Further reading
 
-- [ADR-001: Architecture and standards](adr/001-architecture-and-standards.md)
-- OpenAPI docs at `/docs` when the server is running
+- [DATABASE.md](DATABASE.md) — schema, migrations, write flows
+- [ADR-001](adr/001-architecture-and-standards.md) — architecture decisions
+- OpenAPI: http://localhost:8000/docs
 - Sample workflow: `tests/fixtures/workflow_test.json`
