@@ -118,6 +118,75 @@ def test_validate_metadata_binding_allows_system_and_declared_keys():
     assert issues == []
 
 
+def test_binder_resolves_current_total_including_null():
+    binder = GraphInputBinder(_NoopUpstream())
+    node = GraphNode(
+        id="task-1",
+        kind="task",
+        node_definition_id="def-1",
+        inputs=(
+            GraphInputBinding(
+                input_key="runningTotal",
+                kind="metadata",
+                metadata_key="currentTotal",
+                locked=True,
+            ),
+        ),
+    )
+    resolved_null = binder.resolve(
+        workflow_instance_id="inst-1",
+        graph_node=node,
+        instance_metadata={"currentTotal": None},
+    )
+    assert resolved_null.values == {"runningTotal": None}
+
+    resolved = binder.resolve(
+        workflow_instance_id="inst-1",
+        graph_node=node,
+        instance_metadata={"currentTotal": 15.0},
+    )
+    assert resolved.values == {"runningTotal": 15.0}
+
+
+def test_validate_metadata_binding_allows_current_total():
+    workflow = WorkflowDefinitionIngest.model_validate(
+        {
+            "id": "wf-1",
+            "name": "Meta workflow",
+            "slug": "meta-workflow",
+            "status": "draft",
+            "version": "1",
+            "nodes": [
+                {"id": "start-1", "kind": "start", "position": {"x": 0, "y": 0}},
+                {
+                    "id": "task-1",
+                    "kind": "task",
+                    "nodeDefinitionId": "node-def-1",
+                    "position": {"x": 100, "y": 0},
+                    "inputs": [
+                        {
+                            "inputKey": "runningTotal",
+                            "source": {"kind": "metadata", "key": "currentTotal"},
+                            "locked": True,
+                        }
+                    ],
+                },
+                {"id": "end-1", "kind": "end", "position": {"x": 200, "y": 0}},
+            ],
+            "edges": [
+                {"id": "e1", "source": "start-1", "target": "task-1"},
+                {"id": "e2", "source": "task-1", "target": "end-1"},
+            ],
+        }
+    )
+    issues = validate_input_wiring(
+        workflow,
+        node_output_fields={"node-def-1": {"runningTotal"}},
+        node_input_fields={"node-def-1": {"runningTotal"}},
+    )
+    assert issues == []
+
+
 def test_validate_metadata_binding_rejects_unknown_key():
     workflow = WorkflowDefinitionIngest.model_validate(
         {

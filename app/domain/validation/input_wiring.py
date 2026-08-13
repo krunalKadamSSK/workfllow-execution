@@ -3,8 +3,11 @@ from collections import defaultdict, deque
 from app.domain.validation.issues import ValidationIssue
 from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
 
-# Product-permanent Select RFQ keys always allowed for metadata bindings.
-SYSTEM_METADATA_KEYS = frozenset({"rfqId", "estimateRevision", "estimatedBy", "runName"})
+# Product-permanent keys always allowed for metadata bindings.
+# currentTotal is runtime-maintained (not collected on Select RFQ).
+SYSTEM_METADATA_KEYS = frozenset(
+    {"rfqId", "estimateRevision", "estimatedBy", "runName", "currentTotal"}
+)
 
 
 def _ancestors_by_node(workflow: WorkflowDefinitionIngest) -> dict[str, set[str]]:

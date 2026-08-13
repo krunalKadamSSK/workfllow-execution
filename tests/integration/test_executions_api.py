@@ -108,6 +108,7 @@ class TestExecutionsAPI:
         )
         assert completed["workflow_projection"]["total"] == 15.0
         assert completed["total_cost"] == 15.0
+        assert completed["metadata"]["currentTotal"] == 15.0
         assert completed["execution_summary"]["total"] == 15.0
         assert len(completed["execution_summary"]["items"]) == 1
         assert completed["execution_summary"]["items"][0]["task_name"] == "Raw Material Pricing"
@@ -267,6 +268,7 @@ class TestExecutionsAPI:
         assert node_statuses[GENERAL_INFO_GRAPH_NODE] == "PENDING"
         assert node_statuses[RAW_MATERIAL_GRAPH_NODE] == "INVALIDATED"
         assert reopened["total_cost"] is None
+        assert reopened["metadata"]["currentTotal"] is None
 
         events_response = api_client.get(f"/api/v1/instances/{instance_id}/events")
         event_types = [event["event_type"] for event in events_response.json()]
@@ -333,6 +335,7 @@ class TestExecutionsAPI:
         body = start_response.json()
         assert body["metadata"]["rfqId"] == "RFQ-2026-0001"
         assert body["metadata"]["estimateRevision"] == "1"
+        assert body["metadata"]["currentTotal"] is None
         assert body["rfq_id"] == "RFQ-2026-0001"
         instance_id = body["id"]
 
