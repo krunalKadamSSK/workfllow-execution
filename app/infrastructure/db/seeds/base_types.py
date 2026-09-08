@@ -17,4 +17,12 @@ BASE_TYPES_SEED: list[dict] = [
         "enabled": True,
         "version": "1",
     },
+    {
+        "id": "6a30f2cc1adf6e10e72bcf95",
+        "kind": "configTable",
+        "display_name": "Config table task",
+        "description": "Load configuration DB rows, edit with Synapse fields, aggregations",
+        "enabled": True,
+        "version": "1",
+    },
 ]
