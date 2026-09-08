@@ -118,7 +118,8 @@ def _recompute_total(state: dict[str, Any]) -> None:
         if isinstance(contribution, int | float):
             total += float(contribution)
             found = True
-    state["total"] = total if found else None
+    # Keep currency totals at two decimal places for API / metadata consumers.
+    state["total"] = round(total, 2) if found else None
 
 
 def _invalidate_node_state(

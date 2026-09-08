@@ -83,7 +83,13 @@ def build_execution_summary(
             }
         )
 
+    raw_total = workflow_projection.get("total")
+    total = (
+        round(float(raw_total), 2)
+        if isinstance(raw_total, int | float) and not isinstance(raw_total, bool)
+        else None
+    )
     return {
         "items": items,
-        "total": workflow_projection.get("total"),
+        "total": total,
     }

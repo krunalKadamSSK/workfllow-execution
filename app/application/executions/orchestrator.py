@@ -470,7 +470,7 @@ class WorkflowOrchestrator:
         total = state.get("total")
         meta = dict(instance.instance_metadata or {})
         if isinstance(total, int | float) and not isinstance(total, bool):
-            meta["currentTotal"] = float(total)
+            meta["currentTotal"] = round(float(total), 2)
         else:
             meta["currentTotal"] = None
         instance.instance_metadata = meta

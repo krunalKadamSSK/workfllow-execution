@@ -26,7 +26,8 @@ uvicorn app.main:app --reload --port 8000
 
 | Doc | Contents |
 |-----|----------|
-| **[Developer Guide](docs/DEVELOPER_GUIDE.md)** | Architecture, runtime flow, full API reference, backups, testing |
+| **[Developer Guide](docs/DEVELOPER_GUIDE.md)** | Architecture, runtime flow, full API reference, testing |
+| **[Backups](docs/BACKUPS.md)** | Backup/restore setup (Makefile, db.bat, HTTP API), troubleshooting |
 | **[Database](docs/DATABASE.md)** | Tables, FKs, ER diagram, enums, migrations, write flow |
 | [ADR-001](docs/adr/001-architecture-and-standards.md) | SOLID rules, design patterns, error taxonomy |
 
@@ -80,7 +81,7 @@ db.bat restore backups\my.dump              # restore from dump
 
 Dumps use `pg_dump -Fc` (custom format) and are cross-platform.
 
-Full reference: [Developer Guide — PostgreSQL & backups](docs/DEVELOPER_GUIDE.md#postgresql)
+Full reference: **[docs/BACKUPS.md](docs/BACKUPS.md)** — setup, API, cross-platform restore, troubleshooting.
 
 ## Services (docker-compose)
 

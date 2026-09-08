@@ -35,12 +35,12 @@ def _current_total_cost(state: dict) -> float | None:
     projection = state.get("workflow_projection") or {}
     total = projection.get("total")
     if isinstance(total, int | float) and not isinstance(total, bool):
-        return float(total)
+        return round(float(total), 2)
 
     summary = state.get("execution_summary") or {}
     summary_total = summary.get("total")
     if isinstance(summary_total, int | float) and not isinstance(summary_total, bool):
-        return float(summary_total)
+        return round(float(summary_total), 2)
 
     return None
 

@@ -121,6 +121,39 @@ def test_node_completed_accumulates_float_cost_contributions():
     assert state["total"] == 14.75
 
 
+def test_recompute_total_rounds_to_two_decimal_places():
+    state = initial_workflow_state()
+    state = apply_workflow_projection_event(
+        state,
+        _event(
+            WorkflowEventType.NODE_COMPLETED.value,
+            {
+                "workflow_node_id": "node-1",
+                "workflow_node_instance_id": "node-inst-1",
+                "execution_number": 1,
+                "outputs": {},
+                "cost_contribution": 10.125,
+            },
+            sequence=2,
+        ),
+    )
+    state = apply_workflow_projection_event(
+        state,
+        _event(
+            WorkflowEventType.NODE_COMPLETED.value,
+            {
+                "workflow_node_id": "node-2",
+                "workflow_node_instance_id": "node-inst-2",
+                "execution_number": 1,
+                "outputs": {},
+                "cost_contribution": 0.115,
+            },
+            sequence=3,
+        ),
+    )
+    assert state["total"] == 10.24
+
+
 def test_node_invalidated_recomputes_total():
     state = initial_workflow_state()
     state = apply_workflow_projection_event(

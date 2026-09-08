@@ -55,8 +55,11 @@ class BackupStrategy(ABC):
 class DockerPostgresBackupStrategy(BackupStrategy):
     """Strategy: PostgreSQL backup via Docker container.
 
-    Streams dump over stdout/stdin so pg_dump never writes to container ``/tmp``.
+    Backup streams ``pg_dump`` stdout to the host. Restore copies the dump into
+    the container because ``pg_restore`` does not read custom-format archives from stdin.
     """
+
+    REMOTE_PATH = "/tmp/backup.dump"
 
     @property
     def container(self) -> str:
@@ -81,11 +84,19 @@ class DockerPostgresBackupStrategy(BackupStrategy):
 
     async def _restore_from(self, source: Path) -> None:
         docker = self.platform.docker_command()
-        await self.runner.run_from_file(
+        await self.runner.run_and_check(
+            [
+                docker,
+                "cp",
+                self.platform.host_path(source),
+                f"{self.container}:{self.REMOTE_PATH}",
+            ],
+            error_message="Failed to copy backup into container",
+        )
+        await self.runner.run(
             [
                 docker,
                 "exec",
-                "-i",
                 self.container,
                 "pg_restore",
                 "-U",
@@ -94,10 +105,13 @@ class DockerPostgresBackupStrategy(BackupStrategy):
                 self.database_name,
                 "--clean",
                 "--if-exists",
-                "-",
+                self.REMOTE_PATH,
             ],
-            source,
             allow_warning_exit=True,
+        )
+        await self.runner.run(
+            [docker, "exec", self.container, "rm", "-f", self.REMOTE_PATH],
+            timeout=30,
         )
 
 

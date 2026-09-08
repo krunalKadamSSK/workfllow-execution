@@ -196,7 +196,7 @@ curl -X POST http://localhost:8000/api/v1/backups/{backup_id}/restore
 curl -X DELETE http://localhost:8000/api/v1/backups/{backup_id}
 ```
 
-Implementation: `app/patterns/backups/` (Strategy + Repository). Docker mode streams `pg_dump`/`pg_restore` via container exec without writing to container `/tmp`.
+Implementation: `app/patterns/backups/` (Strategy + Repository). Docker backup streams `pg_dump` stdout to the host; restore uses `docker cp` then `pg_restore` from a temp file in the container.
 
 **Windows:** `db.bat backup` / `db.bat restore`
 
