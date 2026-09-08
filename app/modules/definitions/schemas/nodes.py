@@ -152,17 +152,79 @@ class TableAggregation(BaseModel):
     operation: Literal["sum", "min", "max", "avg", "count"]
 
 
+class ConfigTableDataSource(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    collection: str
+
+
+class ConfigTableQueryInput(BaseModel):
+    """Full Synapse field used as a runtime query parameter.
+
+    Filter binding preferably lives in ``queryFilters``. ``filterField`` /
+    ``filterOperator`` remain for backward compatibility with older clients and
+    may be empty when filters are declared separately.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    type: str = "text"
+    label: str
+    placeholder: str | None = None
+    readOnly: bool = False
+    defaultValue: Any = None
+    validation: list[ValidationRule] = Field(default_factory=list)
+    filterField: str = ""
+    filterOperator: str = "eq"
+
+
+class ConfigTableQueryFilter(BaseModel):
+    """Synapse-style catalog filter bound to a query input or static value."""
+
+    model_config = ConfigDict(extra="allow")
+
+    filterField: str = ""
+    filterOperator: str = "eq"
+    fieldId: str | None = None
+    staticValue: str | None = None
+
+
+class ConfigTableColumnMapping(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    dbField: str
+    field: FormField
+
+
+class ConfigTableConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    dataSource: ConfigTableDataSource
+    queryInputs: list[ConfigTableQueryInput] = Field(default_factory=list)
+    queryFilters: list[ConfigTableQueryFilter] = Field(default_factory=list)
+    columnMappings: list[ConfigTableColumnMapping] = Field(default_factory=list)
+    extraColumns: list[FormField] = Field(default_factory=list)
+    crossFieldConstraints: list[CrossFieldConstraint] = Field(default_factory=list)
+    allowEditFetchedRows: bool = False
+    allowAddRows: bool = True
+    allowDeleteRows: bool = True
+    minRows: int | None = None
+    maxRows: int | None = None
+
+
 class NodeDefinitionJson(BaseModel):
     """JSON blob stored in node_definition_versions.definition_json."""
 
     model_config = ConfigDict(extra="allow")
 
-    baseKind: Literal["userInput", "table", "ai", "script"]
+    baseKind: Literal["userInput", "table", "configTable", "ai", "script"]
     appearance: AppearanceConfig
     description: str | None = None
     output: DeclaredOutput | None = None
     form: FormConfig | None = None
     table: TableConfig | None = None
+    configTable: ConfigTableConfig | None = None
     aggregations: list[TableAggregation] | None = None
 
 
@@ -176,12 +238,13 @@ class NodeDefinitionIngest(BaseModel):
     slug: str
     status: str
     version: str | int
-    baseKind: Literal["userInput", "table", "ai", "script"]
+    baseKind: Literal["userInput", "table", "configTable", "ai", "script"]
     appearance: AppearanceConfig
     description: str | None = None
     output: DeclaredOutput | None = None
     form: FormConfig | None = None
     table: TableConfig | None = None
+    configTable: ConfigTableConfig | None = None
     aggregations: list[TableAggregation] | None = None
 
     def to_stored_json(self) -> dict:
@@ -192,6 +255,7 @@ class NodeDefinitionIngest(BaseModel):
             output=self.output,
             form=self.form,
             table=self.table,
+            configTable=self.configTable,
             aggregations=self.aggregations,
         ).model_dump(exclude_none=True)
         if self.baseKind == "userInput" and "form" not in payload:
@@ -199,6 +263,12 @@ class NodeDefinitionIngest(BaseModel):
         if self.baseKind == "table" and "table" not in payload:
             payload["table"] = TableConfig().model_dump()
         if self.baseKind == "table" and "aggregations" not in payload:
+            payload["aggregations"] = []
+        if self.baseKind == "configTable" and "configTable" not in payload:
+            payload["configTable"] = ConfigTableConfig(
+                dataSource=ConfigTableDataSource(collection="")
+            ).model_dump()
+        if self.baseKind == "configTable" and "aggregations" not in payload:
             payload["aggregations"] = []
         return payload
 

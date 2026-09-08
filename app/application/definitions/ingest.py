@@ -53,6 +53,29 @@ class DefinitionIngestService:
                     details=[issue.to_dict() for issue in output_issues],
                 )
 
+        if payload.baseKind == "configTable":
+            stored = payload.to_stored_json()
+            cfg = stored.get("configTable") or {}
+            if not isinstance(cfg.get("dataSource"), dict) or not str(
+                (cfg.get("dataSource") or {}).get("collection") or ""
+            ).strip():
+                raise ValidationError(
+                    "Config table node definition validation failed",
+                    details=[
+                        {
+                            "code": "MISSING_DATA_SOURCE",
+                            "message": "configTable.dataSource.collection is required",
+                            "field": "configTable.dataSource.collection",
+                        }
+                    ],
+                )
+            output_issues = validate_declared_output(stored)
+            if output_issues:
+                raise ValidationError(
+                    "Config table node definition validation failed",
+                    details=[issue.to_dict() for issue in output_issues],
+                )
+
         existing = self._repo.get_node_definition(payload.id)
         if existing is not None:
             return self._publish_existing_node(existing, payload, created_by=created_by)

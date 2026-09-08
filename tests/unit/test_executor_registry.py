@@ -7,7 +7,9 @@ from app.domain.executors.user_input import UserInputExecutor
 
 def test_default_registry_registers_user_input():
     registry = create_default_registry()
-    assert registry.registered_kinds() == frozenset({"userInput", "table"})
+    assert registry.registered_kinds() == frozenset(
+        {"userInput", "table", "configTable"}
+    )
 
 
 def test_registry_get_executor():

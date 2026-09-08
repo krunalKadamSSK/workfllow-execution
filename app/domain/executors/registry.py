@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.domain.exceptions import NodeExecutionError
+from app.domain.executors.config_table_input import ConfigTableExecutor
 from app.domain.executors.table_input import TableExecutor
 from app.domain.executors.user_input import UserInputExecutor
 from app.domain.ports.executors import NodeExecutor
@@ -29,4 +30,5 @@ def create_default_registry() -> NodeExecutorRegistry:
     registry = NodeExecutorRegistry()
     registry.register(UserInputExecutor())
     registry.register(TableExecutor())
+    registry.register(ConfigTableExecutor())
     return registry

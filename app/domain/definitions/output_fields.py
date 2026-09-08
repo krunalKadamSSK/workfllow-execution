@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.domain.definitions.config_table_fields import (
+    collect_config_table_input_field_ids,
+    collect_config_table_output_field_ids,
+    config_table_cost_contribution,
+)
 from app.domain.definitions.table_fields import (
     collect_table_input_field_ids,
     collect_table_output_field_ids,
@@ -53,7 +58,7 @@ def _user_input_cost_contribution(
 
 
 def declared_output(definition_json: dict[str, Any]) -> dict[str, str] | None:
-    if definition_json.get("baseKind") == "table":
+    if definition_json.get("baseKind") in {"table", "configTable"}:
         return declared_table_output(definition_json)
     return _user_input_declared_output(definition_json)
 
@@ -68,20 +73,29 @@ def _collect_user_input_input_field_ids(definition_json: dict[str, Any]) -> set[
 
 
 def collect_input_field_ids(definition_json: dict[str, Any]) -> set[str]:
-    if definition_json.get("baseKind") == "table":
+    kind = definition_json.get("baseKind")
+    if kind == "table":
         return collect_table_input_field_ids(definition_json)
+    if kind == "configTable":
+        return collect_config_table_input_field_ids(definition_json)
     return _collect_user_input_input_field_ids(definition_json)
 
 
 def collect_output_field_ids(definition_json: dict[str, Any]) -> set[str]:
-    if definition_json.get("baseKind") == "table":
+    kind = definition_json.get("baseKind")
+    if kind == "table":
         return collect_table_output_field_ids(definition_json)
+    if kind == "configTable":
+        return collect_config_table_output_field_ids(definition_json)
     return _collect_user_input_output_field_ids(definition_json)
 
 
 def cost_contribution(definition_json: dict[str, Any], outputs: dict[str, Any]) -> float | None:
-    if definition_json.get("baseKind") == "table":
+    kind = definition_json.get("baseKind")
+    if kind == "table":
         return table_cost_contribution(definition_json, outputs)
+    if kind == "configTable":
+        return config_table_cost_contribution(definition_json, outputs)
     return _user_input_cost_contribution(definition_json, outputs)
 
 
@@ -109,7 +123,7 @@ def validate_declared_output(definition_json: dict[str, Any]) -> list[Validation
             )
         ]
 
-    if definition_json.get("baseKind") == "table":
+    if definition_json.get("baseKind") in {"table", "configTable"}:
         aggregations = definition_json.get("aggregations") or []
         aggregation = next(
             (row for row in aggregations if isinstance(row, dict) and row.get("id") == output_id),
