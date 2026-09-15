@@ -2,8 +2,8 @@
 
 **Status:** Accepted (amended)
 **Date:** 2026-06-18
-**Last updated:** 2026-08-13
-**Phase:** 1 — Runtime engine (definitions, executions, events, backups)
+**Last updated:** 2026-09-15
+**Phase:** 1 — Runtime engine (definitions, executions, events, backups) + AccessCore auth
 
 ## Context
 
@@ -113,15 +113,11 @@ Database URLs may be supplied as `postgresql://`, `postgres://`, or `postgresql+
 
 ### Security boundary
 
-**Decision (deferred):** Application-layer authentication and authorization are **not implemented**. All routes are open to callers that reach the process.
+**Decision:** Application authn/authz is **AccessCore REST** (`introspect` + `authorize`) via `require_permission` on definitions, instances, and backups. See [ACCESSCORE.md](../ACCESSCORE.md).
 
-**Expectation for production:** Enforce authn/authz at an API gateway, service mesh, or reverse proxy. Treat these as admin-only until protected:
+When `ACCESSCORE_ENABLED=false` (default for pytest), guards no-op. Production must enable AccessCore and issue a managed API key.
 
-- `POST /api/v1/backups/{id}/restore`
-- `GET /api/v1/instances/export`
-- `POST /api/v1/definitions/*`
-
-Audit fields (`created_by`, `executed_by`) are client-supplied strings — not trustworthy without authenticated identity.
+Audit fields `created_by` / `executed_by` are bound to the AccessCore subject when auth is enabled; client-supplied values are only used as fallback when disabled.
 
 ### Error taxonomy
 
@@ -203,7 +199,7 @@ Documented here so ADR stays honest about current boundaries. Not blockers for l
 
 | Gap | Risk | Intended direction |
 |-----|------|-------------------|
-| No authn/authz | Open admin surface | Gateway auth or app middleware + roles |
+| AccessCore misconfig | 401/403 on all gated routes | Set `ACCESSCORE_*` + seed keys; see ACCESSCORE.md |
 | Parallel terminal submit race | Workflow stuck `RUNNING` | Lock workflow row or atomic completion update |
 | Workflow projection RMW | Lost updates under concurrent events | `FOR UPDATE` or sequence CAS on projection |
 | No submit idempotency | Ambiguous retry after timeout | `Idempotency-Key` or payload-hash dedup |

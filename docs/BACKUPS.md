@@ -566,7 +566,7 @@ make db-restore file=backups/your_latest.dump
 
 ## Security notes
 
-- Backup/restore endpoints have **no built-in authentication** — treat as admin operations.
+- Backup/restore HTTP routes require AccessCore `backups.*` permissions when `ACCESSCORE_ENABLED=true` (admin-only in the seed map).
 - In production, set `BACKUP_ALLOW_RESTORE=false` unless restore is explicitly required.
 - Restrict network access to backup endpoints at the gateway or firewall.
 - Backup files contain full database data — protect the `backups/` directory permissions.

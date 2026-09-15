@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from app.api.controllers.backups import BackupHttpController
+from app.api.deps import require_permission
 from app.api.schemas.common.pagination import PageResult, PaginationParams
 
 router = APIRouter(prefix="/backups", tags=["Backups"])
@@ -17,7 +18,11 @@ def get_backup_controller() -> BackupHttpController:
     return BackupHttpController()
 
 
-@router.get("", response_model=PageResult[dict[str, Any]])
+@router.get(
+    "",
+    response_model=PageResult[dict[str, Any]],
+    dependencies=[require_permission("backups.read")],
+)
 async def list_backups(
     pagination: PaginationParams = Depends(),
     controller: BackupHttpController = Depends(get_backup_controller),
@@ -25,14 +30,22 @@ async def list_backups(
     return await controller.list_backups(pagination=pagination)
 
 
-@router.post("", response_class=JSONResponse)
+@router.post(
+    "",
+    response_class=JSONResponse,
+    dependencies=[require_permission("backups.create")],
+)
 async def create_backup(
     controller: BackupHttpController = Depends(get_backup_controller),
 ) -> JSONResponse:
     return await controller.create_backup()
 
 
-@router.post("/{backup_id}/restore", response_class=JSONResponse)
+@router.post(
+    "/{backup_id}/restore",
+    response_class=JSONResponse,
+    dependencies=[require_permission("backups.update")],
+)
 async def restore_backup(
     backup_id: str,
     controller: BackupHttpController = Depends(get_backup_controller),
@@ -40,7 +53,11 @@ async def restore_backup(
     return await controller.restore_backup(backup_id=backup_id)
 
 
-@router.delete("/{backup_id}", response_class=JSONResponse)
+@router.delete(
+    "/{backup_id}",
+    response_class=JSONResponse,
+    dependencies=[require_permission("backups.delete")],
+)
 async def delete_backup(
     backup_id: str,
     controller: BackupHttpController = Depends(get_backup_controller),

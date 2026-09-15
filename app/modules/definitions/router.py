@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_session
+from app.api.deps import get_session, require_permission
 from app.application.definitions.ingest import DefinitionIngestService
 from app.modules.definitions.schemas.base_types import BaseTypeResponse
 from app.modules.definitions.schemas.nodes import NodeDefinitionIngest
@@ -18,7 +18,11 @@ from app.modules.definitions.schemas.workflows import WorkflowDefinitionIngest
 router = APIRouter(prefix="/definitions", tags=["definitions"])
 
 
-@router.get("/base-types", response_model=list[BaseTypeResponse])
+@router.get(
+    "/base-types",
+    response_model=list[BaseTypeResponse],
+    dependencies=[require_permission("workflow_definition.read")],
+)
 def list_base_types(
     session: Session = Depends(get_session),
 ) -> list[BaseTypeResponse]:
@@ -52,7 +56,12 @@ def _workflow_response(workflow, version) -> WorkflowDefinitionResponse:
     )
 
 
-@router.post("/nodes", response_model=NodeDefinitionResponse, status_code=201)
+@router.post(
+    "/nodes",
+    response_model=NodeDefinitionResponse,
+    status_code=201,
+    dependencies=[require_permission("node_definition.create")],
+)
 def publish_node_definition(
     payload: NodeDefinitionIngest,
     session: Session = Depends(get_session),
@@ -63,7 +72,11 @@ def publish_node_definition(
     return _node_response(node, version)
 
 
-@router.get("/nodes", response_model=list[NodeDefinitionSummary])
+@router.get(
+    "/nodes",
+    response_model=list[NodeDefinitionSummary],
+    dependencies=[require_permission("node_definition.read")],
+)
 def list_node_definitions(
     session: Session = Depends(get_session),
 ) -> list[NodeDefinitionSummary]:
@@ -71,7 +84,11 @@ def list_node_definitions(
     return [NodeDefinitionSummary.model_validate(node) for node in service.list_nodes()]
 
 
-@router.get("/nodes/{slug}", response_model=NodeDefinitionResponse)
+@router.get(
+    "/nodes/{slug}",
+    response_model=NodeDefinitionResponse,
+    dependencies=[require_permission("node_definition.read")],
+)
 def get_node_definition(
     slug: str,
     version: int | None = None,
@@ -82,7 +99,11 @@ def get_node_definition(
     return _node_response(node, node_version)
 
 
-@router.get("/nodes/{slug}/versions/{version}", response_model=NodeDefinitionResponse)
+@router.get(
+    "/nodes/{slug}/versions/{version}",
+    response_model=NodeDefinitionResponse,
+    dependencies=[require_permission("node_definition.read")],
+)
 def get_node_definition_version(
     slug: str,
     version: int,
@@ -93,7 +114,12 @@ def get_node_definition_version(
     return _node_response(node, node_version)
 
 
-@router.post("/workflows", response_model=WorkflowDefinitionResponse, status_code=201)
+@router.post(
+    "/workflows",
+    response_model=WorkflowDefinitionResponse,
+    status_code=201,
+    dependencies=[require_permission("workflow_definition.create")],
+)
 def publish_workflow_definition(
     payload: WorkflowDefinitionIngest,
     session: Session = Depends(get_session),
@@ -104,7 +130,11 @@ def publish_workflow_definition(
     return _workflow_response(workflow, version)
 
 
-@router.get("/workflows", response_model=list[WorkflowDefinitionSummary])
+@router.get(
+    "/workflows",
+    response_model=list[WorkflowDefinitionSummary],
+    dependencies=[require_permission("workflow_definition.read")],
+)
 def list_workflow_definitions(
     session: Session = Depends(get_session),
 ) -> list[WorkflowDefinitionSummary]:
@@ -114,7 +144,11 @@ def list_workflow_definitions(
     ]
 
 
-@router.get("/workflows/{slug}", response_model=WorkflowDefinitionResponse)
+@router.get(
+    "/workflows/{slug}",
+    response_model=WorkflowDefinitionResponse,
+    dependencies=[require_permission("workflow_definition.read")],
+)
 def get_workflow_definition(
     slug: str,
     version: int | None = None,
@@ -125,7 +159,11 @@ def get_workflow_definition(
     return _workflow_response(workflow, workflow_version)
 
 
-@router.get("/workflows/{slug}/versions/{version}", response_model=WorkflowDefinitionResponse)
+@router.get(
+    "/workflows/{slug}/versions/{version}",
+    response_model=WorkflowDefinitionResponse,
+    dependencies=[require_permission("workflow_definition.read")],
+)
 def get_workflow_definition_version(
     slug: str,
     version: int,

@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_session
+from app.api.deps import get_session, require_permission, resolve_actor_id
 from app.application.executions.service import ExecutionService
 from app.domain.enums import NodeStatus
+from app.infrastructure.accesscore import IntrospectResult
 from app.modules.executions.schemas import (
     CancelWorkflowRequest,
     CurrentTaskResponse,
@@ -122,6 +123,7 @@ def _instance_summary(instance) -> WorkflowInstanceSummaryResponse:
 @router.post("", response_model=WorkflowInstanceResponse, status_code=201)
 def start_workflow(
     payload: StartWorkflowRequest,
+    subject: IntrospectResult | None = require_permission("workflow_instance.create"),
     service: ExecutionService = Depends(get_execution_service),
     session: Session = Depends(get_session),
 ) -> WorkflowInstanceResponse:
@@ -129,7 +131,7 @@ def start_workflow(
         name=payload.name,
         workflow_definition_id=payload.workflow_definition_id,
         version=payload.version,
-        created_by=payload.created_by,
+        created_by=resolve_actor_id(subject, payload.created_by),
         metadata=payload.metadata,
         seed_from_instance_id=payload.seed_from_instance_id,
     )
@@ -138,7 +140,7 @@ def start_workflow(
     return _instance_response(state)
 
 
-@router.get("", response_model=list[WorkflowInstanceSummaryResponse])
+@router.get("", response_model=list[WorkflowInstanceSummaryResponse], dependencies=[require_permission("workflow_instance.read")])
 def list_instances(
     rfqId: str = Query(..., min_length=1, description="RFQ id to list workflow revisions for"),
     incompleteOnly: bool = Query(
@@ -151,7 +153,7 @@ def list_instances(
     return [_instance_summary(instance) for instance in instances]
 
 
-@router.get("/rfq/{rfq_id}/incomplete", response_model=RfqIncompleteCheckResponse)
+@router.get("/rfq/{rfq_id}/incomplete", response_model=RfqIncompleteCheckResponse, dependencies=[require_permission("workflow_instance.read")])
 def check_incomplete_revision(
     rfq_id: str,
     service: ExecutionService = Depends(get_execution_service),
@@ -162,7 +164,7 @@ def check_incomplete_revision(
     )
 
 
-@router.get("/export")
+@router.get("/export", dependencies=[require_permission("workflow_instance.read")])
 def export_all_instances(
     service: ExecutionService = Depends(get_execution_service),
 ) -> Response:
@@ -174,7 +176,7 @@ def export_all_instances(
     )
 
 
-@router.get("/{instance_id}/export")
+@router.get("/{instance_id}/export", dependencies=[require_permission("workflow_instance.read")])
 def export_instance(
     instance_id: str,
     service: ExecutionService = Depends(get_execution_service),
@@ -187,7 +189,7 @@ def export_instance(
     )
 
 
-@router.get("/{instance_id}", response_model=WorkflowInstanceResponse)
+@router.get("/{instance_id}", response_model=WorkflowInstanceResponse, dependencies=[require_permission("workflow_instance.read")])
 def get_instance(
     instance_id: str,
     service: ExecutionService = Depends(get_execution_service),
@@ -204,6 +206,7 @@ def submit_node_outputs(
     instance_id: str,
     workflow_node_id: str,
     payload: SubmitNodeOutputsRequest,
+    subject: IntrospectResult | None = require_permission("workflow_instance.update"),
     service: ExecutionService = Depends(get_execution_service),
     session: Session = Depends(get_session),
 ) -> WorkflowInstanceResponse:
@@ -211,7 +214,7 @@ def submit_node_outputs(
         workflow_instance_id=instance_id,
         workflow_node_id=workflow_node_id,
         outputs=payload.outputs,
-        executed_by=payload.executed_by,
+        executed_by=resolve_actor_id(subject, payload.executed_by),
         expected_revision=payload.expected_revision,
     )
     session.commit()
@@ -222,6 +225,7 @@ def submit_node_outputs(
 @router.post(
     "/{instance_id}/nodes/{workflow_node_id}/invalidate",
     response_model=WorkflowInstanceResponse,
+    dependencies=[require_permission("workflow_instance.update")],
 )
 def reopen_from_task(
     instance_id: str,
@@ -243,7 +247,7 @@ def reopen_from_task(
     return _instance_response(state)
 
 
-@router.post("/{instance_id}/pause", response_model=WorkflowInstanceResponse)
+@router.post("/{instance_id}/pause", response_model=WorkflowInstanceResponse, dependencies=[require_permission("workflow_instance.update")])
 def pause_workflow(
     instance_id: str,
     payload: WorkflowRevisionRequest | None = None,
@@ -258,7 +262,7 @@ def pause_workflow(
     return _instance_response(service.get_instance_state(instance_id))
 
 
-@router.post("/{instance_id}/resume", response_model=WorkflowInstanceResponse)
+@router.post("/{instance_id}/resume", response_model=WorkflowInstanceResponse, dependencies=[require_permission("workflow_instance.update")])
 def resume_workflow(
     instance_id: str,
     payload: WorkflowRevisionRequest | None = None,
@@ -273,7 +277,7 @@ def resume_workflow(
     return _instance_response(service.get_instance_state(instance_id))
 
 
-@router.post("/{instance_id}/cancel", response_model=WorkflowInstanceResponse)
+@router.post("/{instance_id}/cancel", response_model=WorkflowInstanceResponse, dependencies=[require_permission("workflow_instance.update")])
 def cancel_workflow(
     instance_id: str,
     payload: CancelWorkflowRequest | None = None,
@@ -289,7 +293,7 @@ def cancel_workflow(
     return _instance_response(service.get_instance_state(instance_id))
 
 
-@router.get("/{instance_id}/events", response_model=list[WorkflowEventResponse])
+@router.get("/{instance_id}/events", response_model=list[WorkflowEventResponse], dependencies=[require_permission("workflow_instance.read")])
 def list_events(
     instance_id: str,
     service: ExecutionService = Depends(get_execution_service),
@@ -310,6 +314,7 @@ def list_events(
 @router.get(
     "/{instance_id}/node-executions",
     response_model=list[WorkflowNodeExecutionResponse],
+    dependencies=[require_permission("workflow_instance.read")],
 )
 def list_node_executions(
     instance_id: str,

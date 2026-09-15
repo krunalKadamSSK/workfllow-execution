@@ -36,12 +36,21 @@ class Settings(BaseSettings):
         default=[
             "http://localhost:3000",
             "http://localhost:5173",
+            "http://localhost:5174",
         ]
     )
 
     LOG_LEVEL: str = "INFO"
     LOG_JSON: bool = False
     EVENT_HASH_CHAIN: bool = False
+
+    # AccessCore REST peer auth. When true, route guards enforce Bearer + authorize.
+    # Keep false in automated tests without AccessCore; enable for local/prod cutover.
+    ACCESSCORE_ENABLED: bool = False
+    ACCESSCORE_URL: str = "http://localhost:8081"
+    ACCESSCORE_API_KEY: str = ""
+    ACCESSCORE_APPLICATION_ID: str = ""
+    ACCESSCORE_TIMEOUT_SECONDS: float = 5.0
 
     BACKUP_ENABLED: bool = True
     BACKUP_STORAGE_DIR: str = "backups"

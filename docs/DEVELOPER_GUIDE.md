@@ -44,7 +44,11 @@ Key variables in `.env`:
 | `BACKUP_ENABLED` | Enable backup HTTP API and operations |
 | `BACKUP_ALLOW_RESTORE` | Allow restore endpoints (default `true`; set `false` in production unless intentional) |
 | `BACKUP_DEPLOYMENT_MODE` | `docker` (pg_dump via container) or `local` (host tools) |
-| `CORS_ORIGINS` | Allowed browser origins |
+| `CORS_ORIGINS` | Allowed browser origins (include FE `http://localhost:5173`) |
+| `ACCESSCORE_ENABLED` | Enforce Bearer + AccessCore authorize on gated routes (`true` for cutover; `false` for open pytest) |
+| `ACCESSCORE_URL` | AccessCore base URL (default `http://localhost:8081`) |
+| `ACCESSCORE_API_KEY` | Peer API key (`X-AccessCore-Key`) from integration_seed |
+| `ACCESSCORE_APPLICATION_ID` | Optional application id for authorize context |
 
 ### 2. Start infrastructure
 
@@ -83,9 +87,19 @@ Integration tests auto-skip when PostgreSQL is unreachable.
 
 ## Security & production notes
 
-**There is no built-in authentication or authorization.** All API routes are open to any caller that can reach the service. For production:
+**AccessCore REST is the application auth layer** (`POST /v1/sessions/introspect` + `POST /v1/authorize`).
 
-- Place the API behind an authenticated gateway, VPN, or mTLS.
+- Deps: `get_current_subject`, `require_permission("resource.action")` in `app/api/deps.py`
+- Client: `app/infrastructure/accesscore/`
+- Gated: definitions, instances, backups (see [ACCESSCORE.md](./ACCESSCORE.md))
+- When `ACCESSCORE_ENABLED=false`, permission deps no-op (local pytest / emergency bypass)
+- When enabled, require `Authorization: Bearer <SSO app token>`; `created_by` / `executed_by` are taken from the AccessCore subject
+
+Production:
+
+- Set `ACCESSCORE_ENABLED=true` and a managed API key (`workflow-execution`)
+- TLS terminate in front of the API; keep CORS origins explicit
+- See [ACCESSCORE.md](./ACCESSCORE.md) for the full cutover checklist
 - Treat backup restore and bulk export as **admin-only** operations.
 - Set `BACKUP_ALLOW_RESTORE=false` unless restore is explicitly required.
 - Send `expected_revision` on mutating instance calls to avoid lost updates.
@@ -346,7 +360,7 @@ Optional fields on start:
 | `version` | Pin specific workflow definition version (default: latest) |
 | `metadata` | Stored in `instance_metadata` / indexed `rfq_id` |
 | `seed_from_instance_id` | Copy static defaults from prior instance (same workflow definition) |
-| `created_by` | Audit string (client-supplied; not authenticated) |
+| `created_by` | Audit string; overridden by AccessCore subject when auth is enabled |
 
 Response includes `pending_node_ids`, `pending_node_forms`, `next_task_id`, `execution_summary`, `total_cost`.
 

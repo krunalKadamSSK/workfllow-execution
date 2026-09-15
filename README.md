@@ -27,6 +27,7 @@ uvicorn app.main:app --reload --port 8000
 | Doc | Contents |
 |-----|----------|
 | **[Developer Guide](docs/DEVELOPER_GUIDE.md)** | Architecture, runtime flow, full API reference, testing |
+| **[AccessCore](docs/ACCESSCORE.md)** | Auth cutover, permission map, E2E checklist |
 | **[Backups](docs/BACKUPS.md)** | Backup/restore setup (Makefile, db.bat, HTTP API), troubleshooting |
 | **[Database](docs/DATABASE.md)** | Tables, FKs, ER diagram, enums, migrations, write flow |
 | [ADR-001](docs/adr/001-architecture-and-standards.md) | SOLID rules, design patterns, error taxonomy |
