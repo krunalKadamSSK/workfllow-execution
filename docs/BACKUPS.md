@@ -6,7 +6,8 @@ PostgreSQL backup and restore for the Workflow Execution Engine. Three methods a
 |--------|----------|----------|
 | **Makefile** | Linux / macOS | Local dev, CI, scripts |
 | **db.bat** | Windows (cmd.exe) | Local dev on Windows |
-| **HTTP API** | Any | UI, automation, remote triggers |
+| **HTTP API** | Any | Legacy; off by default (`LEGACY_HTTP_BACKUPS_ENABLED=false`). Prefer **Backup Ops** for product DR. |
+| **Backup Ops** | Any | Unified ZIP for AccessCore + Configurator + Workflow (Costing Engine **Backups** UI) |
 
 All methods produce the same format: **PostgreSQL custom dump** (`pg_dump -Fc`) stored as `.dump` files. Dumps are **cross-platform** — a backup from Windows can be restored on Linux/macOS and vice versa.
 

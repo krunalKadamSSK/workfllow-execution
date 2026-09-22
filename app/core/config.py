@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     BACKUP_TOOL_PATH: str = ""
     BACKUP_RETENTION_COUNT: int = 20
     BACKUP_ALLOW_RESTORE: bool = True
+    # Phase 5: HTTP /backups routes off by default (use Backup Ops). CLI make db-backup unchanged.
+    LEGACY_HTTP_BACKUPS_ENABLED: bool = False
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

@@ -30,8 +30,10 @@ setup_cors(app)
 register_exception_handlers(app)
 
 app.include_router(health_router)
-# Root alias keeps `/backups` working; primary API is under `/api/v1`.
-app.include_router(backups_router)
-app.include_router(backups_router, prefix=settings.API_V1_PREFIX)
+# Phase 5 cutover: prefer Backup Ops. Re-enable with LEGACY_HTTP_BACKUPS_ENABLED=true.
+# CLI `make db-backup` / repository still use BACKUP_* settings independently.
+if settings.LEGACY_HTTP_BACKUPS_ENABLED:
+    app.include_router(backups_router)
+    app.include_router(backups_router, prefix=settings.API_V1_PREFIX)
 app.include_router(definitions_router, prefix=settings.API_V1_PREFIX)
 app.include_router(executions_router, prefix=settings.API_V1_PREFIX)

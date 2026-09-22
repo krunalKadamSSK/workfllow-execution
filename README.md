@@ -61,7 +61,7 @@ make db-backup file=backups/my.dump         # custom path
 make db-restore file=backups/my.dump        # restore from dump
 ```
 
-**HTTP API** (also mounted at `/backups` and `/api/v1/backups`):
+**HTTP API** (mounted only when `LEGACY_HTTP_BACKUPS_ENABLED=true`; product DR uses Backup Ops):
 
 | Method | Path | Description |
 |--------|------|-------------|

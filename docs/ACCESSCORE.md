@@ -3,6 +3,9 @@
 End-to-end auth for CostEstimationEngine-Frontend, CostEstimationEngine-Backend,
 and this Workflow Engine.
 
+**Canonical product guide:** [CostEstimationEngine-Frontend/docs/ACCESSCORE.md](../../CostEstimationEngine-Frontend/docs/ACCESSCORE.md)  
+**Generic peer guide (any app):** [AccessCore/docs/PEER_INTEGRATION.md](../../AccessCore/docs/PEER_INTEGRATION.md)
+
 ## Components
 
 | Service | Port (local) | Role |
