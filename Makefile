@@ -5,8 +5,12 @@ POSTGRES_USER := workflow
 POSTGRES_DB := workflow_engine
 BACKUP_DIR := backups
 
+# Platform stack (cost-estimation-platform-infra). Override if repos are not siblings.
+PLATFORM_INFRA ?= $(abspath ../cost-estimation-platform-infra)
+
 .PHONY: up down ps logs install lint format test check pre-commit
 .PHONY: migrate migration migrate-down migrate-current migrate-history
+.PHONY: migrate-platform migrate-platform-current migrate-platform-history migrate-platform-down
 .PHONY: db-psql db-logs db-reset db-wait db-restart db-backup db-restore
 
 up:
@@ -36,6 +40,8 @@ test:
 test-all:
 	pytest -q
 
+# --- Local workflow compose DB (DATABASE_URL / host postgres) ---
+
 migrate:
 	alembic upgrade head
 
@@ -50,6 +56,30 @@ migrate-current:
 
 migrate-history:
 	alembic history -v
+
+# --- Platform infra DB (cep-postgres-workflow via docker network) ---
+# Rebuilds cep-workflow-api:local (unless SKIP_BUILD=1) and runs Alembic.
+# Examples:
+#   make migrate-platform
+#   make migrate-platform-current
+#   make migrate-platform SKIP_BUILD=1
+#   make migrate-platform PLATFORM_INFRA=/path/to/cost-estimation-platform-infra
+
+migrate-platform:
+	PLATFORM_INFRA="$(PLATFORM_INFRA)" SKIP_BUILD="$(SKIP_BUILD)" \
+		./scripts/migrate-platform.sh upgrade
+
+migrate-platform-current:
+	PLATFORM_INFRA="$(PLATFORM_INFRA)" SKIP_BUILD="$(SKIP_BUILD)" \
+		./scripts/migrate-platform.sh current
+
+migrate-platform-history:
+	PLATFORM_INFRA="$(PLATFORM_INFRA)" SKIP_BUILD="$(SKIP_BUILD)" \
+		./scripts/migrate-platform.sh history
+
+migrate-platform-down:
+	PLATFORM_INFRA="$(PLATFORM_INFRA)" SKIP_BUILD="$(SKIP_BUILD)" \
+		./scripts/migrate-platform.sh downgrade
 
 db-wait:
 	@echo "Waiting for PostgreSQL..."
