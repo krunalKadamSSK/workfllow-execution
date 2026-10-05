@@ -201,3 +201,17 @@ def register_exception_handlers(app: FastAPI) -> None:
                 details=exc.details,
             ),
         )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        # Ensure CORS middleware still sees a completed JSON response (bare ASGI
+        # crashes surface in the browser as Axios "Network error").
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=_error_body(
+                code="INTERNAL_ERROR",
+                message="Unexpected server error",
+                request=request,
+                details=[{"type": type(exc).__name__}],
+            ),
+        )
